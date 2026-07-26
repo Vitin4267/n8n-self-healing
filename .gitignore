@@ -1,3 +1,4 @@
 .incident/
+.state/
 *.log
 node_modules/
