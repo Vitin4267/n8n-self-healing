@@ -32,6 +32,19 @@ Two n8n workflows carry the interactive part (**W1** triage/diagnosis, **W2a/W2b
 approval/fix), a Postgres table tracks incident state, and this Git repo is the
 filesystem Claude Code actually reads and writes.
 
+## Development process
+
+Every architecture decision, debugging call, and trade-off in this project
+was made and driven by me — what to build, why a given design was safer or
+simpler, which bug was the real root cause vs. a red herring, when to reject
+an approach and pick a different one. Claude (AI) was used as an assistant
+throughout: writing exact syntax (SQL, regex, shell quoting) I hadn't memorized,
+executing and verifying infrastructure changes, and pushing back when a
+decision needed a second look. I'm disclosing this openly rather than
+presenting the implementation as memorized solo output, since I think how you
+use AI, and whether you understand and can defend what it produces, matters
+more than pretending it wasn't involved.
+
 ## Why it's built this way
 
 - **Two separate approval gates, not one.** WhatsApp approval only authorizes
