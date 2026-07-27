@@ -1,1 +1,353 @@
-{"updatedAt":"2026-07-26T21:36:40.408Z","createdAt":"2026-07-26T20:02:35.941Z","id":"xqqlNTAEAj7FIMRF","name":"Sub - Export Workflows","active":true,"isArchived":false,"nodes":[{"parameters":{"workflowInputs":{"values":[{"name":"workflow_id"}]}},"type":"n8n-nodes-base.executeWorkflowTrigger","typeVersion":1.2,"position":[0,0],"id":"73633950-6fdf-4227-a8a7-d7fd0b70498a","name":"When Executed by Another Workflow"},{"parameters":{"conditions":{"options":{"caseSensitive":true,"leftValue":"","typeValidation":"strict","version":3},"conditions":[{"id":"61c3effb-38b3-42a1-842e-f21ee62431ef","leftValue":"={{ $json.workflow_id }}","rightValue":"String","operator":{"type":"string","operation":"empty","singleValue":true}}],"combinator":"and"},"options":{}},"type":"n8n-nodes-base.if","typeVersion":2.3,"position":[208,0],"id":"f2e72037-03fb-490b-9f48-c12c9915879d","name":"If"},{"parameters":{"url":"=http://localhost:5678/api/v1/workflows/{{ $json.workflow_id }}","authentication":"genericCredentialType","genericAuthType":"httpHeaderAuth","options":{}},"type":"n8n-nodes-base.httpRequest","typeVersion":4.4,"position":[448,256],"id":"71418c58-cdb9-4e3e-85c5-39cc70cd8d1f","name":"HTTP Request","credentials":{"httpHeaderAuth":{"id":"9LE8QmwWnjmnTygU","name":"n8n"}}},{"parameters":{"url":"http://localhost:5678/api/v1/workflows","authentication":"genericCredentialType","genericAuthType":"httpHeaderAuth","options":{}},"type":"n8n-nodes-base.httpRequest","typeVersion":4.4,"position":[448,-288],"id":"f19c3e35-9274-40cd-85bd-c4110a7aa6a3","name":"HTTP Request1","credentials":{"httpHeaderAuth":{"id":"9LE8QmwWnjmnTygU","name":"n8n"}}},{"parameters":{"fieldToSplitOut":"data","options":{}},"type":"n8n-nodes-base.splitOut","typeVersion":1,"position":[656,-288],"id":"f55212cf-ec4a-4161-83f9-a7bfd015a55c","name":"Split Out"},{"parameters":{"operation":"write","fileName":"=/home/victor-ferrareto-dias/projects/n8n-self-healing/workflows/{{ $('Split Out').item.json.id }}.json","options":{}},"type":"n8n-nodes-base.readWriteFile","typeVersion":1.1,"position":[1072,-288],"id":"014a6dc6-ce8f-448b-b1e4-0ab6cf33c176","name":"Read/Write Files from Disk"},{"parameters":{"operation":"toJson","mode":"each","options":{}},"type":"n8n-nodes-base.convertToFile","typeVersion":1.1,"position":[864,-288],"id":"8a6c703e-6116-4d7f-95ae-e03f0d3e6bf2","name":"Convert to File"},{"parameters":{"command":"cd /home/victor-ferrareto-dias/projects/n8n-self-healing && git add -A && git diff --cached --quiet || (git commit -m \"chore: sync workflows\" && git push)\n"},"type":"n8n-nodes-base.executeCommand","typeVersion":1,"position":[1264,-48],"id":"d76ad4cb-1931-47e3-96ff-56696205b798","name":"Execute Command"},{"parameters":{"operation":"toJson","mode":"each","options":{}},"type":"n8n-nodes-base.convertToFile","typeVersion":1.1,"position":[688,256],"id":"81a5efab-3314-4b6a-848e-f1ccb9b552f3","name":"Convert to File1"},{"parameters":{"operation":"write","fileName":"=/home/victor-ferrareto-dias/projects/n8n-self-healing/workflows/{{ $('When Executed by Another Workflow').item.json.workflow_id }}.json","options":{}},"type":"n8n-nodes-base.readWriteFile","typeVersion":1.1,"position":[944,256],"id":"c12f9302-2fb7-45d2-9861-1ba938fa74d2","name":"Read/Write Files from Disk1"},{"parameters":{"content":"Reusable sub-workflow: exports n8n workflow definitions to the Git repo.\n\nCalled by:\n- W0 (daily schedule, no workflow_id) → exports everything, GitOps safety net\n- W1 (on error, with workflow_id) → exports just the failed workflow, right before invoking Claude Code Phase 1 diagnosis, to guarantee fresh data\n","height":240,"width":352},"type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[-80,-304],"id":"b438c503-dc7d-4eef-956b-fdc5af77c500","name":"Sticky Note"},{"parameters":{"content":"workflow_id is empty → export ALL workflows\n\nGET /api/v1/workflows (list) → split into individual items →\nconvert each to a JSON file → write to workflows/<id>.json\n","height":192,"width":256},"type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[448,-512],"id":"7072ebd8-d7c8-4a1d-8c0b-d80c54f26c7f","name":"Sticky Note1"},{"parameters":{"content":"workflow_id provided → export ONE specific workflow\n\nGET /api/v1/workflows/{id} → convert to JSON file →\nwrite to workflows/<id>.json\n\nNo Split Out needed — API already returns a single item.\n","height":224,"width":256},"type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[448,416],"id":"ad91a54d-21b8-4db3-9cf2-7c1772fd898c","name":"Sticky Note2"}],"connections":{"When Executed by Another Workflow":{"main":[[{"node":"If","type":"main","index":0}]]},"If":{"main":[[{"node":"HTTP Request1","type":"main","index":0}],[{"node":"HTTP Request","type":"main","index":0}]]},"HTTP Request1":{"main":[[{"node":"Split Out","type":"main","index":0}]]},"Split Out":{"main":[[{"node":"Convert to File","type":"main","index":0}]]},"Convert to File":{"main":[[{"node":"Read/Write Files from Disk","type":"main","index":0}]]},"Read/Write Files from Disk":{"main":[[{"node":"Execute Command","type":"main","index":0}]]},"HTTP Request":{"main":[[{"node":"Convert to File1","type":"main","index":0}]]},"Convert to File1":{"main":[[{"node":"Read/Write Files from Disk1","type":"main","index":0}]]},"Read/Write Files from Disk1":{"main":[[{"node":"Execute Command","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","binaryMode":"separate","availableInMCP":false},"staticData":null,"meta":null,"pinData":{"When Executed by Another Workflow":[{"json":{"workflow_id":""}}]},"versionId":"ff6efa6a-26fe-45b1-9ee1-08c056e5aa55","activeVersionId":"ff6efa6a-26fe-45b1-9ee1-08c056e5aa55","triggerCount":0,"shared":[{"updatedAt":"2026-07-26T20:02:35.943Z","createdAt":"2026-07-26T20:02:35.943Z","role":"workflow:owner","workflowId":"xqqlNTAEAj7FIMRF","projectId":"UAE6kKMPM4scsiS3"}],"activeVersion":{"updatedAt":"2026-07-26T21:58:54.000Z","createdAt":"2026-07-26T21:36:40.408Z","versionId":"ff6efa6a-26fe-45b1-9ee1-08c056e5aa55","workflowId":"xqqlNTAEAj7FIMRF","nodes":[{"parameters":{"workflowInputs":{"values":[{"name":"workflow_id"}]}},"type":"n8n-nodes-base.executeWorkflowTrigger","typeVersion":1.2,"position":[0,0],"id":"73633950-6fdf-4227-a8a7-d7fd0b70498a","name":"When Executed by Another Workflow"},{"parameters":{"conditions":{"options":{"caseSensitive":true,"leftValue":"","typeValidation":"strict","version":3},"conditions":[{"id":"61c3effb-38b3-42a1-842e-f21ee62431ef","leftValue":"={{ $json.workflow_id }}","rightValue":"String","operator":{"type":"string","operation":"empty","singleValue":true}}],"combinator":"and"},"options":{}},"type":"n8n-nodes-base.if","typeVersion":2.3,"position":[208,0],"id":"f2e72037-03fb-490b-9f48-c12c9915879d","name":"If"},{"parameters":{"url":"=http://localhost:5678/api/v1/workflows/{{ $json.workflow_id }}","authentication":"genericCredentialType","genericAuthType":"httpHeaderAuth","options":{}},"type":"n8n-nodes-base.httpRequest","typeVersion":4.4,"position":[448,256],"id":"71418c58-cdb9-4e3e-85c5-39cc70cd8d1f","name":"HTTP Request","credentials":{"httpHeaderAuth":{"id":"9LE8QmwWnjmnTygU","name":"n8n"}}},{"parameters":{"url":"http://localhost:5678/api/v1/workflows","authentication":"genericCredentialType","genericAuthType":"httpHeaderAuth","options":{}},"type":"n8n-nodes-base.httpRequest","typeVersion":4.4,"position":[448,-288],"id":"f19c3e35-9274-40cd-85bd-c4110a7aa6a3","name":"HTTP Request1","credentials":{"httpHeaderAuth":{"id":"9LE8QmwWnjmnTygU","name":"n8n"}}},{"parameters":{"fieldToSplitOut":"data","options":{}},"type":"n8n-nodes-base.splitOut","typeVersion":1,"position":[656,-288],"id":"f55212cf-ec4a-4161-83f9-a7bfd015a55c","name":"Split Out"},{"parameters":{"operation":"write","fileName":"=/home/victor-ferrareto-dias/projects/n8n-self-healing/workflows/{{ $('Split Out').item.json.id }}.json","options":{}},"type":"n8n-nodes-base.readWriteFile","typeVersion":1.1,"position":[1072,-288],"id":"014a6dc6-ce8f-448b-b1e4-0ab6cf33c176","name":"Read/Write Files from Disk"},{"parameters":{"operation":"toJson","mode":"each","options":{}},"type":"n8n-nodes-base.convertToFile","typeVersion":1.1,"position":[864,-288],"id":"8a6c703e-6116-4d7f-95ae-e03f0d3e6bf2","name":"Convert to File"},{"parameters":{"command":"cd /home/victor-ferrareto-dias/projects/n8n-self-healing && git add -A && git diff --cached --quiet || (git commit -m \"chore: sync workflows\" && git push)\n"},"type":"n8n-nodes-base.executeCommand","typeVersion":1,"position":[1264,-48],"id":"d76ad4cb-1931-47e3-96ff-56696205b798","name":"Execute Command"},{"parameters":{"operation":"toJson","mode":"each","options":{}},"type":"n8n-nodes-base.convertToFile","typeVersion":1.1,"position":[688,256],"id":"81a5efab-3314-4b6a-848e-f1ccb9b552f3","name":"Convert to File1"},{"parameters":{"operation":"write","fileName":"=/home/victor-ferrareto-dias/projects/n8n-self-healing/workflows/{{ $('When Executed by Another Workflow').item.json.workflow_id }}.json","options":{}},"type":"n8n-nodes-base.readWriteFile","typeVersion":1.1,"position":[944,256],"id":"c12f9302-2fb7-45d2-9861-1ba938fa74d2","name":"Read/Write Files from Disk1"},{"parameters":{"content":"Reusable sub-workflow: exports n8n workflow definitions to the Git repo.\n\nCalled by:\n- W0 (daily schedule, no workflow_id) → exports everything, GitOps safety net\n- W1 (on error, with workflow_id) → exports just the failed workflow, right before invoking Claude Code Phase 1 diagnosis, to guarantee fresh data\n","height":240,"width":352},"type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[-80,-304],"id":"b438c503-dc7d-4eef-956b-fdc5af77c500","name":"Sticky Note"},{"parameters":{"content":"workflow_id is empty → export ALL workflows\n\nGET /api/v1/workflows (list) → split into individual items →\nconvert each to a JSON file → write to workflows/<id>.json\n","height":192,"width":256},"type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[448,-512],"id":"7072ebd8-d7c8-4a1d-8c0b-d80c54f26c7f","name":"Sticky Note1"},{"parameters":{"content":"workflow_id provided → export ONE specific workflow\n\nGET /api/v1/workflows/{id} → convert to JSON file →\nwrite to workflows/<id>.json\n\nNo Split Out needed — API already returns a single item.\n","height":224,"width":256},"type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[448,416],"id":"ad91a54d-21b8-4db3-9cf2-7c1772fd898c","name":"Sticky Note2"}],"connections":{"When Executed by Another Workflow":{"main":[[{"node":"If","type":"main","index":0}]]},"If":{"main":[[{"node":"HTTP Request1","type":"main","index":0}],[{"node":"HTTP Request","type":"main","index":0}]]},"HTTP Request1":{"main":[[{"node":"Split Out","type":"main","index":0}]]},"Split Out":{"main":[[{"node":"Convert to File","type":"main","index":0}]]},"Convert to File":{"main":[[{"node":"Read/Write Files from Disk","type":"main","index":0}]]},"Read/Write Files from Disk":{"main":[[{"node":"Execute Command","type":"main","index":0}]]},"HTTP Request":{"main":[[{"node":"Convert to File1","type":"main","index":0}]]},"Convert to File1":{"main":[[{"node":"Read/Write Files from Disk1","type":"main","index":0}]]},"Read/Write Files from Disk1":{"main":[[{"node":"Execute Command","type":"main","index":0}]]}},"nodeGroups":[],"authors":"VICTOR DIAS","name":"Version ff6efa6a","description":"","autosaved":true},"tags":[]}
+{
+  "id": "xqqlNTAEAj7FIMRF",
+  "name": "Sub - Export Workflows",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "workflow_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "73633950-6fdf-4227-a8a7-d7fd0b70498a",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "61c3effb-38b3-42a1-842e-f21ee62431ef",
+              "leftValue": "={{ $json.workflow_id }}",
+              "rightValue": "String",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "f2e72037-03fb-490b-9f48-c12c9915879d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:5678/api/v1/workflows/{{ $json.workflow_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        256
+      ],
+      "id": "71418c58-cdb9-4e3e-85c5-39cc70cd8d1f",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9LE8QmwWnjmnTygU",
+          "name": "n8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5678/api/v1/workflows",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        -288
+      ],
+      "id": "f19c3e35-9274-40cd-85bd-c4110a7aa6a3",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9LE8QmwWnjmnTygU",
+          "name": "n8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        656,
+        -288
+      ],
+      "id": "f55212cf-ec4a-4161-83f9-a7bfd015a55c",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/user/projects/n8n-self-healing/workflows/{{ $('Split Out').item.json.id }}.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1072,
+        -288
+      ],
+      "id": "014a6dc6-ce8f-448b-b1e4-0ab6cf33c176",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        -288
+      ],
+      "id": "8a6c703e-6116-4d7f-95ae-e03f0d3e6bf2",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "command": "cd /home/user/projects/n8n-self-healing && git add -A && git diff --cached --quiet || (git commit -m \"chore: sync workflows\" && git push)\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        -48
+      ],
+      "id": "d76ad4cb-1931-47e3-96ff-56696205b798",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        688,
+        256
+      ],
+      "id": "81a5efab-3314-4b6a-848e-f1ccb9b552f3",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/user/projects/n8n-self-healing/workflows/{{ $('When Executed by Another Workflow').item.json.workflow_id }}.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        944,
+        256
+      ],
+      "id": "c12f9302-2fb7-45d2-9861-1ba938fa74d2",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "content": "Reusable sub-workflow: exports n8n workflow definitions to the Git repo.\n\nCalled by:\n- W0 (daily schedule, no workflow_id) → exports everything, GitOps safety net\n- W1 (on error, with workflow_id) → exports just the failed workflow, right before invoking Claude Code Phase 1 diagnosis, to guarantee fresh data\n",
+        "height": 240,
+        "width": 352
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -304
+      ],
+      "id": "b438c503-dc7d-4eef-956b-fdc5af77c500",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "workflow_id is empty → export ALL workflows\n\nGET /api/v1/workflows (list) → split into individual items →\nconvert each to a JSON file → write to workflows/<id>.json\n",
+        "height": 192,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -512
+      ],
+      "id": "7072ebd8-d7c8-4a1d-8c0b-d80c54f26c7f",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "workflow_id provided → export ONE specific workflow\n\nGET /api/v1/workflows/{id} → convert to JSON file →\nwrite to workflows/<id>.json\n\nNo Split Out needed — API already returns a single item.\n",
+        "height": 224,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        416
+      ],
+      "id": "ad91a54d-21b8-4db3-9cf2-7c1772fd898c",
+      "name": "Sticky Note2"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk1": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ff6efa6a-26fe-45b1-9ee1-08c056e5aa55",
+  "createdAt": "2026-07-26 20:02:35.941",
+  "updatedAt": "2026-07-26 21:36:40.408"
+}

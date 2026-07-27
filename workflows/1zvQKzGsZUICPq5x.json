@@ -1,1 +1,104 @@
-{"updatedAt":"2026-07-26T21:58:35.342Z","createdAt":"2026-07-26T21:49:10.270Z","id":"1zvQKzGsZUICPq5x","name":"W0 - Daily Export","active":true,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"triggerAtHour":3}]}},"type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.3,"position":[0,0],"id":"d29f5ca0-6333-4bcc-aa51-7fcc0bb74a60","name":"Schedule Trigger"},{"parameters":{"workflowId":{"__rl":true,"value":"xqqlNTAEAj7FIMRF","mode":"list","cachedResultUrl":"/workflow/xqqlNTAEAj7FIMRF","cachedResultName":"Sub - Export Workflows"},"workflowInputs":{"mappingMode":"defineBelow","value":{},"matchingColumns":["workflow_id"],"schema":[{"id":"workflow_id","displayName":"workflow_id","required":false,"defaultMatch":false,"display":true,"canBeUsedToMatch":true,"type":"string","removed":false}],"attemptToConvertTypes":false,"convertFieldsToString":true},"options":{}},"type":"n8n-nodes-base.executeWorkflow","typeVersion":1.3,"position":[208,0],"id":"67ce23d4-d5ae-4ea7-8fcb-25ab07879451","name":"Call 'Sub - Export Workflows'"}],"connections":{"Schedule Trigger":{"main":[[{"node":"Call 'Sub - Export Workflows'","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","binaryMode":"separate","availableInMCP":false},"staticData":{"node:Schedule Trigger":{"recurrenceRules":[]}},"meta":null,"pinData":{},"versionId":"c98f1490-3c55-430d-9172-c478828cb034","activeVersionId":"c98f1490-3c55-430d-9172-c478828cb034","triggerCount":1,"shared":[{"updatedAt":"2026-07-26T21:49:10.271Z","createdAt":"2026-07-26T21:49:10.271Z","role":"workflow:owner","workflowId":"1zvQKzGsZUICPq5x","projectId":"UAE6kKMPM4scsiS3"}],"activeVersion":{"updatedAt":"2026-07-26T21:59:01.000Z","createdAt":"2026-07-26T21:56:51.254Z","versionId":"c98f1490-3c55-430d-9172-c478828cb034","workflowId":"1zvQKzGsZUICPq5x","nodes":[{"parameters":{"rule":{"interval":[{"triggerAtHour":3}]}},"type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.3,"position":[0,0],"id":"d29f5ca0-6333-4bcc-aa51-7fcc0bb74a60","name":"Schedule Trigger"},{"parameters":{"workflowId":{"__rl":true,"value":"xqqlNTAEAj7FIMRF","mode":"list","cachedResultUrl":"/workflow/xqqlNTAEAj7FIMRF","cachedResultName":"Sub - Export Workflows"},"workflowInputs":{"mappingMode":"defineBelow","value":{},"matchingColumns":["workflow_id"],"schema":[{"id":"workflow_id","displayName":"workflow_id","required":false,"defaultMatch":false,"display":true,"canBeUsedToMatch":true,"type":"string","removed":false}],"attemptToConvertTypes":false,"convertFieldsToString":true},"options":{}},"type":"n8n-nodes-base.executeWorkflow","typeVersion":1.3,"position":[208,0],"id":"67ce23d4-d5ae-4ea7-8fcb-25ab07879451","name":"Call 'Sub - Export Workflows'"}],"connections":{"Schedule Trigger":{"main":[[{"node":"Call 'Sub - Export Workflows'","type":"main","index":0}]]}},"nodeGroups":[],"authors":"VICTOR DIAS","name":"Version c98f1490","description":"","autosaved":true},"tags":[]}
+{
+  "id": "1zvQKzGsZUICPq5x",
+  "name": "W0 - Daily Export",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d29f5ca0-6333-4bcc-aa51-7fcc0bb74a60",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "xqqlNTAEAj7FIMRF",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/xqqlNTAEAj7FIMRF",
+          "cachedResultName": "Sub - Export Workflows"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [
+            "workflow_id"
+          ],
+          "schema": [
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "67ce23d4-d5ae-4ea7-8fcb-25ab07879451",
+      "name": "Call 'Sub - Export Workflows'"
+    },
+    {
+      "parameters": {
+        "content": "Optional safety net (not required for healing to work): once a day,\nre-exports every workflow so the repo never drifts too far behind\nproduction, even for workflows that never error.",
+        "height": 220,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -272
+      ],
+      "id": "df8388b1-3b93-4a4b-b7fb-b92bbaabaa0b",
+      "name": "Note-e2952847"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Call 'Sub - Export Workflows'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "bc93149e-ffa6-4b83-82b8-fcfbf50c0019",
+  "createdAt": "2026-07-26 21:49:10.270",
+  "updatedAt": "2026-07-27 16:47:59.700"
+}

@@ -1,1 +1,1129 @@
-{"updatedAt":"2026-07-26T21:57:59.207Z","createdAt":"2026-07-26T21:57:59.207Z","id":"AZWei6MYYJDihsBi","name":"W1","active":false,"isArchived":false,"nodes":[],"connections":{},"settings":{"executionOrder":"v1","binaryMode":"separate","availableInMCP":false},"staticData":null,"meta":null,"pinData":{},"versionId":"1ffb0c28-0239-4ba6-b896-664f2d2edbce","activeVersionId":null,"triggerCount":0,"shared":[{"updatedAt":"2026-07-26T21:57:59.208Z","createdAt":"2026-07-26T21:57:59.208Z","role":"workflow:owner","workflowId":"AZWei6MYYJDihsBi","projectId":"UAE6kKMPM4scsiS3"}],"activeVersion":null,"tags":[]}
+{
+  "id": "AZWei6MYYJDihsBi",
+  "name": "W1",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a663c53a-7925-49b5-8aa6-5115b16741cc",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS incidents (\n  id SERIAL PRIMARY KEY,\n  fingerprint TEXT NOT NULL,\n  workflow_id TEXT NOT NULL,\n  workflow_name TEXT,\n  node_name TEXT,\n  error_type TEXT,\n  error_message TEXT,\n  execution_url TEXT,\n  occurrences INTEGER DEFAULT 1,\n  severity TEXT,\n  status TEXT NOT NULL DEFAULT 'triaging',\n  diagnosis_json TEXT,\n  approval_token TEXT,\n  token_used BOOLEAN DEFAULT false,\n  expires_at TIMESTAMPTZ,\n  pr_url TEXT,\n  created_at TIMESTAMPTZ DEFAULT now(),\n  updated_at TIMESTAMPTZ DEFAULT now()\n);\nCREATE INDEX IF NOT EXISTS idx_fingerprint_status ON incidents (fingerprint, status);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        544,
+        0
+      ],
+      "id": "c215b74a-77ef-41c3-9f19-31bfac620955",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wf = $json.workflow;\nconst exec = $json.execution;\n\nconst rawMessage = exec.error?.message || '';\nconst normalizedMessage = rawMessage\n  .replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, '<uuid>')\n  .replace(/\\d{4}-\\d{2}-\\d{2}T[\\d:.Z-]+/g, '<timestamp>')\n  .replace(/\\d+/g, '<n>');\n\nconst raw = `${wf.id}|${exec.lastNodeExecuted}|${normalizedMessage}`;\nconst fingerprint = require('crypto').createHash('sha256').update(raw).digest('hex');\n\nreturn [{\n  json: {\n    fingerprint,\n    workflow_id: wf.id,\n    workflow_name: wf.name,\n    node_name: exec.lastNodeExecuted,\n    error_message: rawMessage,\n    execution_url: exec.url,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        0
+      ],
+      "id": "415e3443-ab52-429e-b8f6-8f30edb182d6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, occurrences FROM incidents\nWHERE fingerprint = $1\n  AND status IN ('triaging', 'awaiting_approval', 'pr_open')\nLIMIT 1;\n",
+        "options": {
+          "queryReplacement": "={{ [$('Code in JavaScript').item.json.fingerprint] }}\n"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        896,
+        0
+      ],
+      "id": "f28ac85c-ae3d-41c4-a657-99e589d58d48",
+      "name": "Check Dedup",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "47825ec8-e766-4bbe-b53e-8080c5bce03f",
+              "leftValue": "={{ $json.id == null }}",
+              "rightValue": "undefined",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "13ce999f-d3bc-4f5d-9cae-02b045f48cdb",
+              "leftValue": "={{ $json.id  == undefined}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1296,
+        0
+      ],
+      "id": "d4591a15-3a0c-447b-8ea6-94ba3bd958ca",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "content": "Fires when a production workflow fails for real (webhook, schedule —\nnever a manual \"Execute\" click in the editor). Delivers workflow.id/name,\nexecution.lastNodeExecuted, execution.error.message, execution.url.\nNo clean \"error type\" field exists — only message + stack.\n\n\n",
+        "height": 192,
+        "width": 464
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -48
+      ],
+      "id": "90df8836-e36e-4673-a960-12b187c46fe8",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "[EN]\nBuilds a dedup fingerprint: normalizes the error message (strips UUIDs/\ntimestamps/numbers so the same recurring bug still matches), then SHA-256\nhashes workflow_id + node + normalized message.\nNeeds NODE_FUNCTION_ALLOW_BUILTIN=crypto (blocked by default in n8n).\n\n",
+        "height": 208,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        176
+      ],
+      "id": "dda1cca7-2ca1-4550-ba78-1d26375508f6",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Ensures the `incidents` table exists (idempotent, safe every run).\nMUST run before Check Dedup — querying a table that doesn't exist\nyet would fail on the very first execution.\n\n\n",
+        "width": 496
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        480,
+        192
+      ],
+      "id": "54c787e8-679a-4ae2-a7a8-329eaf97a272",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "Checks if this fingerprint already has an active incident (status:\ntriaging / awaiting_approval / pr_open). \"Always Output Data\" must be\nON — a 0-row match returns 0 items in n8n, and nothing downstream runs\nwithout an item. The `id` returned is the incidents row id, NOT the\nworkflow id.\n\n",
+        "height": 208,
+        "width": 560
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        608,
+        -544
+      ],
+      "id": "380e8695-a728-4f57-abd8-293e29f79b75",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3e2e88a4-25bf-40f1-8422-17953ee6987b",
+              "name": "fingerprint",
+              "value": "={{ $('Code in JavaScript').item.json.fingerprint }}",
+              "type": "string"
+            },
+            {
+              "id": "004ccc9d-2c2d-46b9-8a94-1b63a1a177a0",
+              "name": "workflow_id",
+              "value": "={{ $('Code in JavaScript').item.json.workflow_id }}",
+              "type": "string"
+            },
+            {
+              "id": "eeafcc81-b1c3-4c3c-ae38-60ae1f23a568",
+              "name": "workflow_name",
+              "value": "={{ $('Code in JavaScript').item.json.workflow_name }}",
+              "type": "string"
+            },
+            {
+              "id": "987b8ac4-9ab6-490c-8f5b-8f7ca5fb5c33",
+              "name": "node_name",
+              "value": "={{ $('Code in JavaScript').item.json.node_name }}",
+              "type": "string"
+            },
+            {
+              "id": "930cda5a-6aff-41c6-9c3c-64e00610a790",
+              "name": "error_message",
+              "value": "={{ $('Code in JavaScript').item.json.error_message }}",
+              "type": "string"
+            },
+            {
+              "id": "87aed921-315a-480d-8a74-559f13d8e7c4",
+              "name": "execution_url",
+              "value": "={{ $('Code in JavaScript').item.json.execution_url }}",
+              "type": "string"
+            },
+            {
+              "id": "ea5aa525-53bd-4764-a6b6-52ce99bd836c",
+              "name": "existing_incident_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "3335c965-eb61-462c-af3f-614adea69061",
+              "name": "existing_occurrences",
+              "value": "={{ $json.occurrences }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        0
+      ],
+      "id": "00c2e8c8-de09-4487-81f0-1cdac9f38fab",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents\nSET occurrences = occurrences + 1, updated_at = now()\nWHERE id = {{ $json.existing_incident_id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1504,
+        256
+      ],
+      "id": "84b12fb2-bcd3-4e0a-b8fd-db2fd1126621",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Workflow Name: {{ $json.workflow_name }}\nNode name: {{ $json.node_name }}\nError Message: {{ $json.error_message }}\nexecution URL: {{ $json.execution_url }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "# ROLE\nYou are a severity classifier for automated errors in a production n8n\nautomation system. You receive details of a single workflow execution\nfailure and must decide how severe it is and whether it warrants\nescalation to an expensive human-reviewed AI diagnosis process — only\nescalate what genuinely matters.\n\n# INPUT\nYou will receive: workflow name, the node that failed, the raw error\nmessage, and a link to the failed execution.\n\n# SEVERITY CRITERIA\nScore the error considering:\n- Financial impact (does this touch payments, invoicing, orders?)\n- External visibility (does a customer/user directly see this failure?)\n- Reversibility (can this be manually fixed/retried without side effects?)\n- Cascade effect (does this block or corrupt other workflows/data?)\n- Persistence (transient blip vs. a broken state that stays broken?)\n- Time sensitivity (does delay make this worse — expiring tokens, SLA windows?)\n\n# OUTPUT (strict JSON only — no prose, no markdown fences)\n{\n  \"severity\": \"low\" | \"medium\" | \"high\" | \"critical\",\n  \"escalate\": true | false,\n  \"reason\": \"one sentence explaining the classification\"\n}\n\n# RULES\n- Always output valid JSON matching the schema above. Never refuse,\n  never ask a clarifying question, never add text outside the JSON object.\n- escalate=true for \"high\" and \"critical\". escalate=false for \"low\" and\n  \"medium\", unless there's a clear reason a lower-severity error still\n  needs human eyes (explain that in \"reason\" if so).\n- If the error is ambiguous or you're unsure, default to a HIGHER\n  severity rather than lower — missing a critical error is worse than\n  an unnecessary escalation (fail-open).\n\n- ALWAYS produce a classification, even if the input looks like placeholder,\n  test, or example data (e.g. \"Example Workflow\", \"Test error\"). Treat any\n  input as real and classify it — never leave the response empty and never\n  skip calling the output tool for any reason.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2160,
+        -304
+      ],
+      "id": "334d67de-3870-459e-9496-7093c50dd5d3",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4o-mini",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        -112
+      ],
+      "id": "2d597dd8-92f6-4890-b48d-e274ab224b67",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "4ewBOUzod853B6Zx",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"severity\": {\n      \"type\": \"string\",\n      \"enum\": [\"low\", \"medium\", \"high\", \"critical\"],\n      \"description\": \"How severe this error is\"\n    },\n    \"escalate\": {\n      \"type\": \"boolean\",\n      \"description\": \"Whether this error should be escalated to the expensive AI diagnosis process\"\n    },\n    \"reason\": {\n      \"type\": \"string\",\n      \"description\": \"One sentence explaining the classification\"\n    }\n  },\n  \"required\": [\"severity\", \"escalate\", \"reason\"]\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2304,
+        -112
+      ],
+      "id": "9699d6e6-e023-45ab-ab11-811ac8acc4b6",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO incidents (fingerprint, workflow_id, workflow_name, node_name, error_message, execution_url, status, occurrences)\nVALUES ($1, $2, $3, $4, $5, $6, 'triaging', 1)\nRETURNING id;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.fingerprint, $json.workflow_id, $json.workflow_name, $json.node_name, $json.error_message, $json.execution_url] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1456,
+        -176
+      ],
+      "id": "dee44471-634c-4838-84c0-5718fc918962",
+      "name": "Insert New Incident",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.recent_count }}",
+                    "rightValue": "=5",
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "id": "cf5b6232-2393-4f9a-8726-79ab2b606f46"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pass"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8b099365-8372-4ae4-ac3e-beb75a02732c",
+                    "leftValue": "={{ $json.recent_count }}",
+                    "rightValue": 5,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "spam"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1808,
+        -176
+      ],
+      "id": "91898405-f8a4-4c7b-bddb-701e936622fb",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS recent_count\nFROM incidents\nWHERE fingerprint = $1\n  AND created_at > now() - interval '10 minutes';\n",
+        "options": {
+          "queryReplacement": "={{ [$('Edit Fields1').item.json.fingerprint] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1648,
+        -176
+      ],
+      "id": "04151f5f-3625-4140-aaf0-dd9ff2bcf467",
+      "name": "Rate Limit Check",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67fd1784-6514-4288-8ab5-2d05e9db1d60",
+              "name": "workflow_name",
+              "value": "={{ $('Edit Fields1').item.json.workflow_name }}",
+              "type": "string"
+            },
+            {
+              "id": "88e24cb6-5171-4a40-a1ea-fe796a0e5eb0",
+              "name": "node_name",
+              "value": "={{ $('Edit Fields1').item.json.node_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b8050d77-8954-4a77-b2e6-3598df64b17a",
+              "name": "error_message",
+              "value": "={{ $('Edit Fields1').item.json.error_message }}",
+              "type": "string"
+            },
+            {
+              "id": "2f61c5ba-42c4-4918-bd45-9c351168d6d4",
+              "name": "execution_url",
+              "value": "={{ $('Edit Fields1').item.json.execution_url }}",
+              "type": "string"
+            },
+            {
+              "id": "58192a10-180f-4ebc-8c2c-b69ae914b5d7",
+              "name": "incident_id",
+              "value": "={{ $('Insert New Incident').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1936,
+        -304
+      ],
+      "id": "e437be44-4ee8-4690-8536-9839cda5de13",
+      "name": "Prepare AI Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b688a3f1-d53d-4d7f-8dab-13dba05ed789",
+              "leftValue": "={{ $json.output.escalate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2512,
+        -304
+      ],
+      "id": "e3819720-a9d1-4ef3-a58b-912f00d1327a",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents\nSET status = 'logged', severity = $1\nWHERE id = $2;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.output.severity, $('Insert New Incident').item.json.id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2736,
+        -80
+      ],
+      "id": "227f5b61-84d7-4db2-bee8-ce0efc362d46",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "xqqlNTAEAj7FIMRF",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/xqqlNTAEAj7FIMRF",
+          "cachedResultName": "Sub - Export Workflows"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflow_id": "={{ $('Edit Fields1').item.json.workflow_id }}"
+          },
+          "matchingColumns": [
+            "workflow_id"
+          ],
+          "schema": [
+            {
+              "id": "workflow_id",
+              "displayName": "workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2736,
+        -320
+      ],
+      "id": "7099834b-9c79-4151-8783-a498cb01cb40",
+      "name": "Call 'Sub - Export Workflows'"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "=={\n  \"incident_id\": \"{{ $('Prepare AI Input').item.json.incident_id }}\",\n  \"workflow_id\": \"{{ $('Edit Fields1').item.json.workflow_id }}\",\n  \"workflow_name\": \"{{ $('Edit Fields1').item.json.workflow_name }}\",\n  \"workflow_file\": \"workflows/{{ $('Edit Fields1').item.json.workflow_id }}.json\",\n  \"node_name\": \"{{ $('Edit Fields1').item.json.node_name }}\",\n  \"error_message\": \"{{ $('Edit Fields1').item.json.error_message }}\",\n  \"execution_url\": \"{{ $('Edit Fields1').item.json.execution_url }}\",\n  \"severity\": \"{{ $('AI Agent').item.json.output.severity }}\",\n  \"reason\": \"{{ $('AI Agent').item.json.output.reason }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2944,
+        -320
+      ],
+      "id": "0dfd2e35-5e32-4219-93a9-f40bf237665d",
+      "name": "Build Incident File"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        3136,
+        -320
+      ],
+      "id": "73dbbd4a-fa41-4be7-8a8f-fff548be4329",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/user/projects/n8n-self-healing/.incident/current.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        3312,
+        -320
+      ],
+      "id": "b003110d-2d93-4a31-b648-c0c34743be17",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "command": "flock -w 300 /var/lock/heal.lock -c '\ncd /home/user/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\nclaude -p \"$(cat prompts/diagnose.md)\" \\\n  --allowedTools \"Read,Grep,Glob\" \\\n  --output-format json --max-turns 25'\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        -320
+      ],
+      "id": "22335d4a-808c-4be2-90e4-d2331bef8b97",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.stdout;\nconst lines = raw.trim().split('\\n').reverse();\nconst jsonLine = lines.find(l => l.trim().startsWith('{'));\nconst envelope = JSON.parse(jsonLine);\n\nlet resultText = envelope.result.trim();\nconst fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\nif (fenceMatch) {\n  resultText = fenceMatch[1].trim();\n}\nconst diagnosis = JSON.parse(resultText);\n\nreturn [{\n  json: {\n    root_cause: diagnosis.root_cause,\n    evidence: diagnosis.evidence,\n    proposed_fix: diagnosis.proposed_fix,\n    files_to_change: diagnosis.files_to_change,\n    risk: diagnosis.risk,\n    confidence: diagnosis.confidence,\n    needs_human_context: diagnosis.needs_human_context,\n    cost_usd: envelope.total_cost_usd\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3728,
+        -320
+      ],
+      "id": "15b69f43-79a7-425b-97ad-d581875381f9",
+      "name": "Parse Diagnosis"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, approval_token: require('crypto').randomUUID() } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3920,
+        -320
+      ],
+      "id": "e176be5f-b791-428b-9360-de5b32e0c635",
+      "name": "Generate Token"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents\nSET diagnosis_json = $1,\n    status = 'awaiting_approval',\n    approval_token = $2,\n    expires_at = now() + interval '48 hours'\nWHERE id = $3;\n",
+        "options": {
+          "queryReplacement": "={{ [JSON.stringify($json), $json.approval_token, $('Prepare AI Input').item.json.incident_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4128,
+        -320
+      ],
+      "id": "46edb0f9-3980-4636-b75f-9f7aef99cf5d",
+      "name": "Save Diagnosis & Generate Token",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "testeN8N",
+        "remoteJid": "5511999999999",
+        "messageText": "=🔍 *Incident Diagnosis*\n\n*Root cause:* {{ $('Parse Diagnosis').item.json.root_cause }}\n\n*Proposed fix:* {{ $('Parse Diagnosis').item.json.proposed_fix || \"None (not a real failure)\" }}\n\n*Risk:* {{ $('Parse Diagnosis').item.json.risk }} | *Confidence:* {{ $('Parse Diagnosis').item.json.confidence }}\n\n👉 Review & approve: http://localhost:5678/webhook/heal-review?incident={{ $('Prepare AI Input').item.json.incident_id }}&token={{ $('Generate Token').item.json.approval_token }}\n",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        4320,
+        -320
+      ],
+      "id": "fb96267c-b65c-431c-8283-9da8d71b504c",
+      "name": "Send Text",
+      "credentials": {
+        "evolutionApi": {
+          "id": "sBgmDLxmg8tMefir",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents\nSET status = 'expired'\nWHERE status = 'awaiting_approval'\n  AND expires_at < now();\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        720,
+        0
+      ],
+      "id": "5a1b85e8-3f94-48cd-a173-aae3b2020be1",
+      "name": "Expire Old Incidents",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "DETECTION: fires when a production workflow fails for real, then\nbuilds a dedup fingerprint from workflow+node+normalized error message.",
+        "height": 124,
+        "width": 380
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -208
+      ],
+      "id": "3977757e-30aa-4ab2-a292-1f3fb5fc0e00",
+      "name": "Note-9aaf3f7f"
+    },
+    {
+      "parameters": {
+        "content": "HOUSEKEEPING: ensures the incidents table exists, and expires any\nincident stuck in \"awaiting_approval\" past 48h so the same fingerprint\ncan be triaged again instead of staying blocked forever.",
+        "height": 240,
+        "width": 420
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -288
+      ],
+      "id": "4057020d-2350-43a5-8299-d89553c434aa",
+      "name": "Note-3814f31d"
+    },
+    {
+      "parameters": {
+        "content": "DEDUP: checks if this fingerprint already has an ACTIVE incident\n(triaging/awaiting_approval/pr_open). If yes -> just increments\noccurrences below and stops (never re-notifies while still active).",
+        "height": 240,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -288
+      ],
+      "id": "873292ad-dc20-44ee-b10e-64ac01f54ca2",
+      "name": "Note-68f575fa"
+    },
+    {
+      "parameters": {
+        "content": "NEW INCIDENT PATH: creates the incidents row, then a per-fingerprint\nrate limit (sliding 10-min window, threshold 5) decides whether to\nproceed to AI classification or treat this as a burst/flood.",
+        "height": 172,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        -368
+      ],
+      "id": "d0e0f4dc-495b-48a5-b074-9ede74c4ddb4",
+      "name": "Note-05f41fd4"
+    },
+    {
+      "parameters": {
+        "content": "SEVERITY CLASSIFICATION: an LLM (GPT-4o-mini via OpenRouter — Gemini\n2.5 Flash-Lite doesn't support the tool-calling this node needs)\nscores severity and decides escalate true/false.",
+        "height": 152,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        -480
+      ],
+      "id": "9f2b783c-ea8e-4b9c-a462-caa1aa4b6128",
+      "name": "Note-5ade5bcc"
+    },
+    {
+      "parameters": {
+        "content": "ESCALATION: if escalate=true, exports the specific failed workflow\nfresh (freshness over the daily W0 snapshot) before Claude Code reads\nit — guarantees Phase 1 never diagnoses a stale file.",
+        "height": 168,
+        "width": 364
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2544,
+        -512
+      ],
+      "id": "0d199acb-ac8e-4d7a-a20f-252e002fe8ed",
+      "name": "Note-2489fb83"
+    },
+    {
+      "parameters": {
+        "content": "PHASE 1 (read-only): writes .incident/current.json, then invokes\nClaude Code with --allowedTools \"Read,Grep,Glob\" only — physically\nunable to change anything, just investigates and reports.",
+        "height": 172,
+        "width": 400
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3072,
+        -560
+      ],
+      "id": "a05d51b9-2785-4f86-b930-9af75bd878e1",
+      "name": "Note-46341a9c"
+    },
+    {
+      "parameters": {
+        "content": "PERSIST & NOTIFY: parses the diagnosis (strips markdown fences,\nJSON.parse), generates a single-use approval token (48h expiry), saves\nit all to the incident row, then sends the WhatsApp review link.",
+        "height": 124,
+        "width": 556
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3712,
+        -480
+      ],
+      "id": "aa4ba6b3-7057-44ab-bd64-169d5dedb941",
+      "name": "Note-ba5eb93c"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Dedup": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Expire Old Incidents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Insert New Incident",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert New Incident": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Check": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Call 'Sub - Export Workflows'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Sub - Export Workflows'": {
+      "main": [
+        [
+          {
+            "node": "Build Incident File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Incident File": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Parse Diagnosis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Diagnosis": {
+      "main": [
+        [
+          {
+            "node": "Generate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Token": {
+      "main": [
+        [
+          {
+            "node": "Save Diagnosis & Generate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Diagnosis & Generate Token": {
+      "main": [
+        [
+          {
+            "node": "Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expire Old Incidents": {
+      "main": [
+        [
+          {
+            "node": "Check Dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "NyMhXxnkyTbhmVQj",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "7872191e-a35c-498b-aa36-7b7210f2dc03",
+  "createdAt": "2026-07-26 21:57:59.207",
+  "updatedAt": "2026-07-27 16:49:59.053"
+}

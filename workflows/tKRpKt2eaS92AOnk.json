@@ -1,0 +1,118 @@
+{
+  "id": "tKRpKt2eaS92AOnk",
+  "name": "W-Digest - Daily Summary",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "122d9c73-4ed6-4ebb-aa87-9f03e6a02f59",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) AS total_count,\n  COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count,\n  COUNT(*) FILTER (WHERE severity = 'high') AS high_count,\n  COUNT(*) FILTER (WHERE severity = 'medium') AS medium_count,\n  COUNT(*) FILTER (WHERE severity = 'low') AS low_count,\n  COUNT(*) FILTER (WHERE status = 'logged') AS logged_count\nFROM incidents\nWHERE created_at > now() - interval '24 hours';\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "259c0a7a-9257-43e9-a1aa-e510bb18e54b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "testeN8N",
+        "remoteJid": "5511999999999",
+        "messageText": "=📊 *Daily Digest — Last 24h*  Total incidents: {{ $json.total_count }} \n🔴 Critical: {{ $json.critical_count }} \n🟠 High: {{ $json.high_count }} \n🟡 Medium: {{ $json.medium_count }} \n🟢 Low: {{ $json.low_count }}  \nLogged (not escalated): {{ $json.logged_count }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "302c7543-1380-44f8-92a0-bdbe78e0705b",
+      "name": "Enviar texto",
+      "credentials": {
+        "evolutionApi": {
+          "id": "sBgmDLxmg8tMefir",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Daily summary of the last 24h: counts by severity + how many were\nclassified \"logged\" (low severity, never escalated to Claude Code) —\nvisibility into the incidents that never triggered a WhatsApp alert.",
+        "height": 156,
+        "width": 412
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        48,
+        -192
+      ],
+      "id": "34188876-22b1-4988-8137-f1e803e6fecb",
+      "name": "Note-000f1405"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Enviar texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4b591d32-c864-489c-8c53-9c7d214a4731",
+  "createdAt": "2026-07-27 16:24:47.248",
+  "updatedAt": "2026-07-27 16:50:53.580"
+}
