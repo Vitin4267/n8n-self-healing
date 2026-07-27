@@ -1,1 +1,60 @@
-{"updatedAt":"2026-07-27T14:20:12.310Z","createdAt":"2026-07-26T23:14:58.840Z","id":"kzpmd7KDJ66tRlR5","name":"Test - Force Error","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"path":"force-error","options":{}},"type":"n8n-nodes-base.webhook","typeVersion":2.1,"position":[0,0],"id":"b79ec88d-a201-4975-9a25-acbe7c84727c","name":"Webhook","webhookId":"2ba82d28-dd5d-4a7c-88a6-2ccd994bbcd9"},{"parameters":{"jsCode":"throw new Error(\"CRITICAL: payment gateway connection lost, customer transactions are failing silently\");\n"},"type":"n8n-nodes-base.code","typeVersion":2,"position":[208,0],"id":"15113221-c19f-498a-a571-d32064aaab57","name":"Code in JavaScript"}],"connections":{"Webhook":{"main":[[{"node":"Code in JavaScript","type":"main","index":0}]]}},"settings":{"executionOrder":"v1","binaryMode":"separate","availableInMCP":false,"timeSavedMode":"fixed","errorWorkflow":"AZWei6MYYJDihsBi","callerPolicy":"workflowsFromSameOwner"},"staticData":null,"meta":null,"nodeGroups":[],"pinData":{},"versionId":"20ef1857-3535-459f-9e96-c7ac192325e0","activeVersionId":"20ef1857-3535-459f-9e96-c7ac192325e0","versionCounter":7,"triggerCount":1,"sourceWorkflowId":null,"shared":[{"updatedAt":"2026-07-26T23:14:58.841Z","createdAt":"2026-07-26T23:14:58.841Z","role":"workflow:owner","workflowId":"kzpmd7KDJ66tRlR5","projectId":"UAE6kKMPM4scsiS3","project":{"updatedAt":"2026-06-10T23:55:51.335Z","createdAt":"2026-06-10T23:54:14.230Z","id":"UAE6kKMPM4scsiS3","name":"VICTOR DIAS <ferraretovitor@gmail.com>","type":"personal","icon":null,"description":null,"customTelemetryTags":[],"creatorId":"62720928-d893-4538-b8b6-75c76a71fff1"}}],"tags":[],"activeVersion":{"updatedAt":"2026-07-27T14:20:18.000Z","createdAt":"2026-07-27T14:20:12.311Z","versionId":"20ef1857-3535-459f-9e96-c7ac192325e0","workflowId":"kzpmd7KDJ66tRlR5","nodes":[{"parameters":{"path":"force-error","options":{}},"type":"n8n-nodes-base.webhook","typeVersion":2.1,"position":[0,0],"id":"b79ec88d-a201-4975-9a25-acbe7c84727c","name":"Webhook","webhookId":"2ba82d28-dd5d-4a7c-88a6-2ccd994bbcd9"},{"parameters":{"jsCode":"throw new Error(\"CRITICAL: payment gateway connection lost, customer transactions are failing silently\");\n"},"type":"n8n-nodes-base.code","typeVersion":2,"position":[208,0],"id":"15113221-c19f-498a-a571-d32064aaab57","name":"Code in JavaScript"}],"connections":{"Webhook":{"main":[[{"node":"Code in JavaScript","type":"main","index":0}]]}},"nodeGroups":[],"authors":"VICTOR DIAS","name":"Version 20ef1857","description":"","autosaved":true,"workflowPublishHistory":[{"createdAt":"2026-07-27T14:20:18.648Z","id":171,"workflowId":"kzpmd7KDJ66tRlR5","versionId":"20ef1857-3535-459f-9e96-c7ac192325e0","event":"activated","userId":"62720928-d893-4538-b8b6-75c76a71fff1"}]}}
+{
+  "id": "kzpmd7KDJ66tRlR5",
+  "name": "Test - Force Error",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "force-error",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b79ec88d-a201-4975-9a25-acbe7c84727c",
+      "name": "Webhook",
+      "webhookId": "2ba82d28-dd5d-4a7c-88a6-2ccd994bbcd9"
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error(\"CRITICAL: payment gateway connection lost, customer transactions are failing silently\");\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "15113221-c19f-498a-a571-d32064aaab57",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "AZWei6MYYJDihsBi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "20ef1857-3535-459f-9e96-c7ac192325e0",
+  "createdAt": "2026-07-26 23:14:58.840",
+  "updatedAt": "2026-07-27 14:20:12.310"
+}

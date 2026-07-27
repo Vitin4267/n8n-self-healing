@@ -1,0 +1,253 @@
+{
+  "id": "qUB0JOdrxaUAP7C7",
+  "name": "W2a - Review Page",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "heal-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1c981d46-18f0-4465-89be-5db6199b5221",
+      "name": "Webhook",
+      "webhookId": "ff1e2832-abdb-46f1-8b22-59da8fb34bad"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, diagnosis_json, workflow_name, node_name, error_message, severity\nFROM incidents\nWHERE id = $1\n  AND approval_token = $2\n  AND status = 'awaiting_approval'\n  AND expires_at > now()\nLIMIT 1;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.query.incident, $json.query.token] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "65d7ed96-a7fe-4f80-87d7-c2aab370978e",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "299eea5e-beb8-43c2-924d-2eeaf8bfa7e6",
+              "leftValue": "=$json.id",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "7aa896ce-8d1d-45fc-b109-191d40bad656",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html>\n<body style=\"font-family: sans-serif; text-align: center; padding: 60px;\">\n  <h1>⚠️ Invalid or Expired Link</h1>\n  <p>This approval link is no longer valid. It may have expired (48h) or already been used.</p>\n</body>\n</html>\n",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        176
+      ],
+      "id": "32a6ec3f-81fa-4135-b542-bf2d2731c6ab",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const diagnosis = JSON.parse($json.diagnosis_json);\nconst incidentId = $json.id;\nconst token = $('Webhook').item.json.query.token;\n\nconst html = `\n<html>\n<body style=\"font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px;\">\n  <h1>🔍 Incident Review</h1>\n  <p><strong>Workflow:</strong> ${$json.workflow_name}</p>\n  <p><strong>Node:</strong> ${$json.node_name}</p>\n  <p><strong>Error:</strong> ${$json.error_message}</p>\n  <hr>\n  <p><strong>Root cause:</strong> ${diagnosis.root_cause}</p>\n  <p><strong>Proposed fix:</strong> ${diagnosis.proposed_fix || 'None identified'}</p>\n  <p><strong>Risk:</strong> ${diagnosis.risk} | <strong>Confidence:</strong> ${diagnosis.confidence}</p>\n  <div style=\"margin-top: 30px;\">\n    <form method=\"POST\" action=\"http://localhost:5678/webhook/heal-decide\" style=\"display:inline;\">\n      <input type=\"hidden\" name=\"incident\" value=\"${incidentId}\">\n      <input type=\"hidden\" name=\"token\" value=\"${token}\">\n      <input type=\"hidden\" name=\"action\" value=\"approve\">\n      <button type=\"submit\" style=\"background:#22c55e;color:white;padding:10px 20px;border:none;border-radius:6px;font-size:16px;\">✅ Approve</button>\n    </form>\n    <form method=\"POST\" action=\"http://localhost:5678/webhook/heal-decide\" style=\"display:inline; margin-left:10px;\">\n      <input type=\"hidden\" name=\"incident\" value=\"${incidentId}\">\n      <input type=\"hidden\" name=\"token\" value=\"${token}\">\n      <input type=\"hidden\" name=\"action\" value=\"reject\">\n      <button type=\"submit\" style=\"background:#ef4444;color:white;padding:10px 20px;border:none;border-radius:6px;font-size:16px;\">❌ Reject</button>\n    </form>\n  </div>\n</body>\n</html>\n`;\n\nreturn [{ json: { html } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -208
+      ],
+      "id": "2d0d4200-9cb1-4cf6-a324-a94f84d2468d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        848,
+        -208
+      ],
+      "id": "255ffa47-0f9b-4279-b166-e65f8bc8ae27",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "content": "REVIEW PAGE (GET only — never changes state): validates the token\n(matches, not expired, still awaiting_approval) against the DB, purely\nread-only. Immune to email/link-scanner prefetch auto-approving things.",
+        "height": 172,
+        "width": 452
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -224
+      ],
+      "id": "8c1babf5-f244-419d-aa49-6cd0256a9a7f",
+      "name": "Note-502a482d"
+    },
+    {
+      "parameters": {
+        "content": "True path: builds the HTML page from the approved diagnosis (root\ncause, proposed fix) with two <form> buttons that POST to W2b's\n/heal-decide webhook, carrying incident+token+action as hidden fields.",
+        "height": 172,
+        "width": 444
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        -432
+      ],
+      "id": "535c644e-5467-4974-84f5-a2295945967d",
+      "name": "Note-57570af1"
+    },
+    {
+      "parameters": {
+        "content": "False path: token invalid, expired, or already used — shows a\nsimple \"link no longer valid\" page instead.",
+        "height": 100,
+        "width": 380
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        320
+      ],
+      "id": "22ee1f21-cfcd-4e51-973c-f2c8afd1a536",
+      "name": "Note-29905444"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "NyMhXxnkyTbhmVQj",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "effd856d-3edd-4fa0-8934-f247f483b66b",
+  "createdAt": "2026-07-27 14:58:35.644",
+  "updatedAt": "2026-07-27 16:51:12.982"
+}

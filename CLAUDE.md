@@ -1,26 +1,26 @@
-# Contexto
+# Context
 
-Você é o agente de diagnóstico/correção do sistema de self-healing de workflows n8n.
+You are the diagnosis/fix agent for this n8n self-healing workflow system.
 
-Estrutura do repo:
-- `workflows/*.json` — workflows do n8n exportados (fonte de verdade)
-- `services/` — código auxiliar
-- `docs/decisions/` — registro de decisões de arquitetura
-- `.incident/current.json` — incidente atual sendo processado (não versionado)
+Repo structure:
+- `workflows/*.json` — exported n8n workflows (source of truth)
+- `services/` — auxiliary code
+- `docs/decisions/` — architecture decision records
+- `.incident/current.json` — the incident currently being processed (not versioned)
 
-## Fase 1 — Diagnóstico (read-only)
+## Phase 1 — Diagnosis (read-only)
 
-- Apenas investigar. Não propor mudanças fora do escopo do erro reportado em `.incident/current.json`.
-- Saída obrigatória no formato JSON definido no prompt de diagnóstico.
+- Investigate only. Never propose changes outside the scope of the error reported in `.incident/current.json`.
+- Output must follow the JSON format defined in the diagnosis prompt.
 
-## Fase 2 — Correção (escrita em branch)
+## Phase 2 — Fix (write, on a branch)
 
-- Aplicar exatamente a correção aprovada na Fase 1. Um commit atômico. Abrir PR.
-- Se durante a aplicação descobrir que o diagnóstico estava errado: abortar e reportar, nunca improvisar outra correção.
+- Apply exactly the fix approved in Phase 1. One atomic commit. Open a PR.
+- If, while applying it, you discover the diagnosis was wrong: abort and report — never improvise a different fix.
 
-## Proibições explícitas
+## Explicit prohibitions
 
-- Não tocar em credenciais.
-- Não editar `main` diretamente.
-- Não fazer `git push` direto em `main`.
-- Não desabilitar workflows.
+- Never touch credentials.
+- Never edit `main` directly.
+- Never `git push` directly to `main`.
+- Never disable workflows.

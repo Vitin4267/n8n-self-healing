@@ -1,0 +1,511 @@
+{
+  "id": "YuyxIat8NB2F4TxG",
+  "name": "W2b - Approve & Fix",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "heal-decide",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "363a6bd0-1a4a-420b-bcfd-2a1844639319",
+      "name": "Webhook",
+      "webhookId": "02a7df2a-6664-4082-8a51-c90e3993d628"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents\nSET token_used = true\nWHERE id = $1\n  AND approval_token = $2\n  AND status = 'awaiting_approval'\n  AND expires_at > now()\n  AND token_used = false\nRETURNING id, diagnosis_json, workflow_id, workflow_name, node_name;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.body.incident, $json.body.token] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "b3439981-a8f9-40fe-8270-32da5a5f3785",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ba1c30ed-53ed-4b9e-833d-71555c0c5b06",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "db16718a-e3da-4b2d-839f-59346d11adb2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html>\n<body style=\"font-family: sans-serif; text-align: center; padding: 60px;\">\n  <h1>⚠️ Invalid or Expired Link</h1>\n  <p>This approval link is no longer valid. It may have expired (48h) or already been used.</p>\n</body>\n</html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        192
+      ],
+      "id": "0e4b6b83-3a20-47e1-a95a-c21ce746c9c0",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html>\n<body style=\"font-family: sans-serif; text-align: center; padding: 60px;\">\n  <h1>✅ Decision Received</h1>\n  <p>Processing your decision. You'll get a WhatsApp message with the result shortly.</p>\n</body>\n</html>\n",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        640,
+        -160
+      ],
+      "id": "8389df5c-fdef-48db-b4ca-2286390d9694",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8a880a01-47b8-485a-972b-d06ef6dfc68f",
+              "leftValue": "={{ $('Webhook').item.json.body.action }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        -160
+      ],
+      "id": "0ab2174d-286f-450c-8f3c-9c329d8e242d",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const diagnosis = JSON.parse($json.diagnosis_json);\n\nreturn [{\n  json: {\n    incident_id: $json.id,\n    workflow_id: $json.workflow_id,\n    workflow_file: `workflows/${$json.workflow_id}.json`,\n    diagnosis: {\n      root_cause: diagnosis.root_cause,\n      proposed_fix: diagnosis.proposed_fix,\n      files_to_change: diagnosis.files_to_change\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        -320
+      ],
+      "id": "29c9d114-a86c-42fe-b158-0d14d5623743",
+      "name": "Prepare Fix Incident File"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1184,
+        -320
+      ],
+      "id": "caf970e2-1034-4af0-976c-34d58c529197",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/home/user/projects/n8n-self-healing/.incident/current.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        -320
+      ],
+      "id": "cbeb91e4-feb6-46aa-bae5-543a768e4a13",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "command": "=flock -w 300 /var/lock/heal.lock -c '\ncd /home/user/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\ngit checkout -B fix/incident-{{ $(\"Prepare Fix Incident File\").item.json.incident_id }} && \\\nclaude -p \"$(cat prompts/fix.md)\" \\\n  --allowedTools \"Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*)\" \\\n  --output-format json --max-turns 40'\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        -320
+      ],
+      "id": "c8c20c49-ea29-4c59-9f00-aa1e49ed00c2",
+      "name": "Execute Command"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.stdout;\nconst lines = raw.trim().split('\\n').reverse();\nconst jsonLine = lines.find(l => l.trim().startsWith('{'));\nconst envelope = JSON.parse(jsonLine);\n\nlet resultText = envelope.result.trim();\nconst fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\nif (fenceMatch) {\n  resultText = fenceMatch[1].trim();\n}\nconst fixResult = JSON.parse(resultText);\n\nreturn [{\n  json: {\n    status: fixResult.status,\n    branch: fixResult.branch,\n    pr_url: fixResult.pr_url,\n    commit: fixResult.commit,\n    abort_reason: fixResult.abort_reason,\n    cost_usd: envelope.total_cost_usd\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -320
+      ],
+      "id": "0fe6589c-2c25-44a5-b14d-e1cc54b6a29b",
+      "name": "Parse PR Result"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents\nSET status = CASE WHEN $1 = 'pr_created' THEN 'pr_open' ELSE 'failed_healing' END,\n    pr_url = $2\nWHERE id = $3;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.status, $json.pr_url, $('Prepare Fix Incident File').item.json.incident_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1824,
+        -320
+      ],
+      "id": "f352ef42-3032-43c0-83bd-f44599193ef5",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "testeN8N",
+        "remoteJid": "5511999999999",
+        "messageText": "={{ $('Parse PR Result').item.json.status === 'pr_created' ? '✅ *Fix Applied!*\\n\\nPR opened: ' + $('Parse PR Result').item.json.pr_url : '⚠️ *Fix Aborted*\\n\\nReason: ' + $('Parse PR Result').item.json.abort_reason }}\n",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        1984,
+        -320
+      ],
+      "id": "b532fd34-bb39-458a-a714-280ac952464a",
+      "name": "Enviar texto",
+      "credentials": {
+        "evolutionApi": {
+          "id": "sBgmDLxmg8tMefir",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE incidents SET status = 'rejected' WHERE id = $1;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1024,
+        -16
+      ],
+      "id": "1c8afe21-f4e0-425f-ba43-e789edf14168",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "ATOMIC CONSUME: single UPDATE that only succeeds if id+token match,\nstatus is still awaiting_approval, not expired, AND token_used=false —\nsets token_used=true in the same statement. Prevents double-click from\ntriggering Phase 2 twice (DB serializes concurrent writes).",
+        "height": 212,
+        "width": 444
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -240
+      ],
+      "id": "3ceed06c-2dd9-474b-9723-8a91b44dc7a3",
+      "name": "Note-c6c7c3f0"
+    },
+    {
+      "parameters": {
+        "content": "ASYNC PATTERN: \"Respond to Webhook\" answers the browser immediately\n(\"processing...\"), but the workflow keeps running after it — Phase 2\ncan take minutes and the browser would time out waiting.",
+        "height": 172,
+        "width": 380
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -384
+      ],
+      "id": "3b14cc2b-9e81-40b2-b2b2-bf23809704fe",
+      "name": "Note-a8260870"
+    },
+    {
+      "parameters": {
+        "content": "PHASE 2 (write mode): on a dedicated branch (never touches main),\nallowedTools now includes Edit/Write/Bash(git:*)/Bash(gh pr create:*).\nIf the approved fix turns out empty/inapplicable, it ABORTS and reports\nrather than improvising — verified live in testing.",
+        "height": 112,
+        "width": 572
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -464
+      ],
+      "id": "6c3f797f-cd0e-40b4-8842-a76c964c9e5a",
+      "name": "Note-3d364186"
+    },
+    {
+      "parameters": {
+        "content": "Reject path: just marks the incident as rejected — no Claude Code\ncall, no branch, nothing else happens.",
+        "height": 100,
+        "width": 316
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        960,
+        176
+      ],
+      "id": "64e9f6b7-c2e1-428c-9706-056207aa0dee",
+      "name": "Note-8bc53fe6"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Fix Incident File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Fix Incident File": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Execute Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command": {
+      "main": [
+        [
+          {
+            "node": "Parse PR Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse PR Result": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Enviar texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "NyMhXxnkyTbhmVQj",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "ed0e9538-2929-4352-88fe-74917f645231",
+  "createdAt": "2026-07-27 15:36:21.151",
+  "updatedAt": "2026-07-27 16:50:42.072"
+}
