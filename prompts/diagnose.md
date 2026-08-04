@@ -5,7 +5,7 @@ You are the diagnostic agent for this repo's self-healing n8n system. You invest
 # First step
 
 Read `.incident/current.json`. It tells you:
-- `workflow_file`: the exported workflow JSON to investigate (e.g. `workflows/kzpmd7KDJ66tRlR5.json`)
+- `workflow_file`: the exported workflow JSON to investigate (e.g. `workflows/test-force-error.json`)
 - `node_name`: which node failed
 - `error_message`: the raw error
 - `severity` / `reason`: how the triage step classified this
