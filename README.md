@@ -32,6 +32,23 @@ Two n8n workflows carry the interactive part (**W1** triage/diagnosis, **W2a/W2b
 approval/fix), a Postgres table tracks incident state, and this Git repo is the
 filesystem Claude Code actually reads and writes.
 
+### The workflows
+
+**W1 — Detection & Triage** ([workflow](workflows/w1-detection-triage.json))
+![W1](docs/screenshots/w1-detection-triage.png)
+
+**W2a — Review Page** ([workflow](workflows/w2a-review-page.json))
+![W2a](docs/screenshots/w2a-review-page.png)
+
+**W2b — Approve & Fix** ([workflow](workflows/w2b-approve-and-fix.json))
+![W2b](docs/screenshots/w2b-approve-and-fix.png)
+
+**W0 — Daily Export** ([workflow](workflows/w0-daily-export.json))
+![W0](docs/screenshots/w0-daily-export.png)
+
+**W-Digest — Daily Summary** ([workflow](workflows/w-digest-daily-summary.json))
+![W-Digest](docs/screenshots/w-digest-daily-summary.png)
+
 ## Development process
 
 Every architecture decision, debugging call, and trade-off in this project
