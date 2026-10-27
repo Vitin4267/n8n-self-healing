@@ -1,6 +1,9 @@
 {
+  "updatedAt": "2026-10-27T23:22:41.438Z",
+  "createdAt": "2026-07-26T21:57:59.207Z",
   "id": "AZWei6MYYJDihsBi",
   "name": "W1",
+  "description": null,
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -43,7 +46,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        320,
+        224,
         0
       ],
       "id": "415e3443-ab52-429e-b8f6-8f30edb182d6",
@@ -52,9 +55,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, occurrences FROM incidents\nWHERE fingerprint = $1\n  AND status IN ('triaging', 'awaiting_approval', 'pr_open')\nLIMIT 1;\n",
+        "query": "SELECT id, occurrences FROM incidents\nWHERE fingerprint = $1\n  AND (\n    status IN ('triaging', 'awaiting_approval', 'pr_open')\n    OR created_at > now() - interval '60 minutes'\n  )\nORDER BY created_at DESC\nLIMIT 1;",
         "options": {
-          "queryReplacement": "={{ [$('Code in JavaScript').item.json.fingerprint] }}\n"
+          "queryReplacement": "={{ [$('Code in JavaScript').item.json.fingerprint] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -244,8 +247,10 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE incidents\nSET occurrences = occurrences + 1, updated_at = now()\nWHERE id = {{ $json.existing_incident_id }};",
-        "options": {}
+        "query": "UPDATE incidents\nSET occurrences = occurrences + 1, updated_at = now()\nWHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ [$json.existing_incident_id] }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
@@ -265,10 +270,10 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Workflow Name: {{ $json.workflow_name }}\nNode name: {{ $json.node_name }}\nError Message: {{ $json.error_message }}\nexecution URL: {{ $json.execution_url }}\n",
+        "text": "=Workflow Name: {{ $json.workflow_name }}\nNode name: {{ $json.node_name }}\nError Message: {{ $json.error_message }}\nexecution URL: {{ $json.execution_url }}\nrecent_occurrences:{{ $json.recent_count }} in 10 minutes\n",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "# ROLE\nYou are a severity classifier for automated errors in a production n8n\nautomation system. You receive details of a single workflow execution\nfailure and must decide how severe it is and whether it warrants\nescalation to an expensive human-reviewed AI diagnosis process — only\nescalate what genuinely matters.\n\n# INPUT\nYou will receive: workflow name, the node that failed, the raw error\nmessage, and a link to the failed execution.\n\n# SEVERITY CRITERIA\nScore the error considering:\n- Financial impact (does this touch payments, invoicing, orders?)\n- External visibility (does a customer/user directly see this failure?)\n- Reversibility (can this be manually fixed/retried without side effects?)\n- Cascade effect (does this block or corrupt other workflows/data?)\n- Persistence (transient blip vs. a broken state that stays broken?)\n- Time sensitivity (does delay make this worse — expiring tokens, SLA windows?)\n\n# OUTPUT (strict JSON only — no prose, no markdown fences)\n{\n  \"severity\": \"low\" | \"medium\" | \"high\" | \"critical\",\n  \"escalate\": true | false,\n  \"reason\": \"one sentence explaining the classification\"\n}\n\n# RULES\n- Always output valid JSON matching the schema above. Never refuse,\n  never ask a clarifying question, never add text outside the JSON object.\n- escalate=true for \"high\" and \"critical\". escalate=false for \"low\" and\n  \"medium\", unless there's a clear reason a lower-severity error still\n  needs human eyes (explain that in \"reason\" if so).\n- If the error is ambiguous or you're unsure, default to a HIGHER\n  severity rather than lower — missing a critical error is worse than\n  an unnecessary escalation (fail-open).\n\n- ALWAYS produce a classification, even if the input looks like placeholder,\n  test, or example data (e.g. \"Example Workflow\", \"Test error\"). Treat any\n  input as real and classify it — never leave the response empty and never\n  skip calling the output tool for any reason.\n"
+          "systemMessage": "# ROLE\nYou are a severity classifier for automated errors in a production n8n\nautomation system. You receive details of a single workflow execution\nfailure and must decide how severe it is and whether it warrants\nescalation to an expensive human-reviewed AI diagnosis process — only\nescalate what genuinely matters.\n\n# INPUT\nYou will receive: workflow name, the node that failed, the raw error\nmessage, a link to the failed execution, and recent_occurrences — how\nmany times this exact error (same fingerprint) has happened in the\nlast 10 minutes, including this one.\n\n# SEVERITY CRITERIA\nScore the error considering:\n- Financial impact (does this touch payments, invoicing, orders?)\n- External visibility (does a customer/user directly see this failure?)\n- Reversibility (can this be manually fixed/retried without side effects?)\n- Cascade effect (does this block or corrupt other workflows/data?)\n- Persistence (transient blip vs. a broken state that stays broken?)\n- Time sensitivity (does delay make this worse — expiring tokens, SLA windows?)\n- Frequency (recent_occurrences): a single isolated failure may be a\n  fluke; the same error repeating within a 10-minute window signals a\n  systemic or ongoing problem, not a one-off blip — weigh this up,\n  not down, as recent_occurrences grows.\n\n# OUTPUT (strict JSON only — no prose, no markdown fences)\n{\n  \"severity\": \"low\" | \"medium\" | \"high\" | \"critical\",\n  \"escalate\": true | false,\n  \"reason\": \"one sentence explaining the classification\"\n}\n\n# RULES\n- Always output valid JSON matching the schema above. Never refuse,\n  never ask a clarifying question, never add text outside the JSON object.\n- escalate=true for \"high\" and \"critical\". escalate=false for \"low\" and\n  \"medium\", unless there's a clear reason a lower-severity error still\n  needs human eyes (explain that in \"reason\" if so).\n- HARD OVERRIDE: if the failure means a workflow completely stopped\n  processing (not a partial degradation, but a full halt of its core\n  function — production is down, not just degraded), always classify as\n  at least \"high\" with escalate=true, regardless of how the other\n  criteria score. A fully halted production path is critical by\n  definition, even if the failing component looks small or internal.\n\n- FREQUENCY RULE: if recent_occurrences is 3 or higher, treat this as\n  an ongoing/systemic failure, not an isolated incident — escalate=true\n  regardless of how mild the individual error looks, since a repeating\n  error means whatever auto-recovery or retry exists isn't working.\n\n- If the error is ambiguous or you're unsure, default to a HIGHER\n  severity rather than lower — missing a critical error is worse than\n  an unnecessary escalation (fail-open).\n\n- ALWAYS produce a classification, even if the input looks like placeholder,\n  test, or example data (e.g. \"Example Workflow\", \"Test error\"). Treat any\n  input as real and classify it — never leave the response empty and never\n  skip calling the output tool for any reason.\n\n\n"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -278,7 +283,8 @@
         -304
       ],
       "id": "334d67de-3870-459e-9496-7093c50dd5d3",
-      "name": "AI Agent"
+      "name": "AI Agent",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -382,7 +388,7 @@
                     "rightValue": 5,
                     "operator": {
                       "type": "number",
-                      "operation": "gte"
+                      "operation": "gt"
                     }
                   }
                 ],
@@ -461,6 +467,12 @@
               "name": "incident_id",
               "value": "={{ $('Insert New Incident').item.json.id }}",
               "type": "string"
+            },
+            {
+              "id": "9f04cbfd-eedc-43da-ab18-59619c5aead0",
+              "name": "recent_count",
+              "value": "={{ $('Rate Limit Check').item.json.recent_count }}",
+              "type": "string"
             }
           ]
         },
@@ -514,14 +526,14 @@
         "operation": "executeQuery",
         "query": "UPDATE incidents\nSET status = 'logged', severity = $1\nWHERE id = $2;\n",
         "options": {
-          "queryReplacement": "={{ [$json.output.severity, $('Insert New Incident').item.json.id] }}"
+          "queryReplacement": "={{ [$('Normalize Triage').first().json.output.severity, $('Insert New Incident').first().json.id] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2736,
-        -80
+        2880,
+        -96
       ],
       "id": "227f5b61-84d7-4db2-bee8-ce0efc362d46",
       "name": "Execute a SQL query2",
@@ -577,21 +589,6 @@
     },
     {
       "parameters": {
-        "mode": "raw",
-        "jsonOutput": "=={\n  \"incident_id\": \"{{ $('Prepare AI Input').item.json.incident_id }}\",\n  \"workflow_id\": \"{{ $('Edit Fields1').item.json.workflow_id }}\",\n  \"workflow_name\": \"{{ $('Edit Fields1').item.json.workflow_name }}\",\n  \"workflow_file\": \"workflows/{{ $('Edit Fields1').item.json.workflow_id }}.json\",\n  \"node_name\": \"{{ $('Edit Fields1').item.json.node_name }}\",\n  \"error_message\": \"{{ $('Edit Fields1').item.json.error_message }}\",\n  \"execution_url\": \"{{ $('Edit Fields1').item.json.execution_url }}\",\n  \"severity\": \"{{ $('AI Agent').item.json.output.severity }}\",\n  \"reason\": \"{{ $('AI Agent').item.json.output.reason }}\"\n}\n",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        2944,
-        -320
-      ],
-      "id": "0dfd2e35-5e32-4219-93a9-f40bf237665d",
-      "name": "Build Incident File"
-    },
-    {
-      "parameters": {
         "operation": "toJson",
         "options": {}
       },
@@ -607,7 +604,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/user/projects/n8n-self-healing/.incident/current.json",
+        "fileName": "=/home/victor-ferrareto-dias/projects/n8n-self-healing/.incident/incident-{{ $('Code in JavaScript1').item.json.incident_id }}.json",
         "options": {}
       },
       "type": "n8n-nodes-base.readWriteFile",
@@ -621,7 +618,7 @@
     },
     {
       "parameters": {
-        "command": "flock -w 300 /var/lock/heal.lock -c '\ncd /home/user/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\nclaude -p \"$(cat prompts/diagnose.md)\" \\\n  --allowedTools \"Read,Grep,Glob\" \\\n  --output-format json --max-turns 25'\n"
+        "command": "=flock -w 300 /var/lock/heal.lock -c '\ncd /home/victor-ferrareto-dias/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\ncp .incident/incident-{{ $(\"Code in JavaScript1\").item.json.incident_id }}.json .incident/current.json && \\\nclaude -p \"$(cat prompts/diagnose.md)\" \\\n  --allowedTools \"Read,Grep,Glob\" \\\n  --output-format json --max-turns 25'\n"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -647,23 +644,10 @@
     },
     {
       "parameters": {
-        "jsCode": "return [{ json: { ...$json, approval_token: require('crypto').randomUUID() } }];\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3920,
-        -320
-      ],
-      "id": "e176be5f-b791-428b-9360-de5b32e0c635",
-      "name": "Generate Token"
-    },
-    {
-      "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE incidents\nSET diagnosis_json = $1,\n    status = 'awaiting_approval',\n    approval_token = $2,\n    expires_at = now() + interval '48 hours'\nWHERE id = $3;\n",
+        "query": "UPDATE incidents\nSET diagnosis_json = $1,\n    status = 'awaiting_approval',\n    severity = $2,\n    expires_at = now() + interval '48 hours'\nWHERE id = $3;\n",
         "options": {
-          "queryReplacement": "={{ [JSON.stringify($json), $json.approval_token, $('Prepare AI Input').item.json.incident_id] }}"
+          "queryReplacement": "={{ [JSON.stringify($json), $('Normalize Triage').item.json.output.severity, $('Prepare AI Input').item.json.incident_id] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -685,15 +669,15 @@
       "parameters": {
         "resource": "messages-api",
         "instanceName": "testeN8N",
-        "remoteJid": "5511999999999",
-        "messageText": "=🔍 *Incident Diagnosis*\n\n*Root cause:* {{ $('Parse Diagnosis').item.json.root_cause }}\n\n*Proposed fix:* {{ $('Parse Diagnosis').item.json.proposed_fix || \"None (not a real failure)\" }}\n\n*Risk:* {{ $('Parse Diagnosis').item.json.risk }} | *Confidence:* {{ $('Parse Diagnosis').item.json.confidence }}\n\n👉 Review & approve: http://localhost:5678/webhook/heal-review?incident={{ $('Prepare AI Input').item.json.incident_id }}&token={{ $('Generate Token').item.json.approval_token }}\n",
+        "remoteJid": "={{ $json.phone }}",
+        "messageText": "=🔍 *Incident Diagnosis*\n\n*Root cause:* {{ $('Parse Diagnosis').first().json.root_cause }}\n\n*Proposed fix:* {{ $('Parse Diagnosis').first().json.proposed_fix || \"None (not a real failure)\" }}\n\n*Risk:* {{ $('Parse Diagnosis').first().json.risk }} | *Confidence:* {{ $('Parse Diagnosis').first().json.confidence }}\n\n{{ $json.capability === 'approve' ? '👉 Review & approve:' : '👉 Review & suggest:' }} http://localhost:5678/webhook/heal-review?incident={{ $('Prepare AI Input').first().json.incident_id }}&token={{ $json.token }}\n",
         "options_message": {}
       },
       "type": "n8n-nodes-evolution-api.evolutionApi",
       "typeVersion": 1,
       "position": [
-        4320,
-        -320
+        4736,
+        -64
       ],
       "id": "fb96267c-b65c-431c-8283-9da8d71b504c",
       "name": "Send Text",
@@ -702,12 +686,13 @@
           "id": "sBgmDLxmg8tMefir",
           "name": "Evolution account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE incidents\nSET status = 'expired'\nWHERE status = 'awaiting_approval'\n  AND expires_at < now();\n",
+        "query": "UPDATE incidents\nSET status = 'expired'\nWHERE (status = 'awaiting_approval' AND expires_at < now())\n   OR (status = 'triaging' AND created_at < now() - interval '1 hour');",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -844,6 +829,128 @@
       ],
       "id": "aa4ba6b3-7057-44ab-bd64-169d5dedb941",
       "name": "Note-ba5eb93c"
+    },
+    {
+      "parameters": {
+        "sendTo": "ferraretovitor@gmail.com",
+        "subject": "=[n8n Self-Healing] Incidente {{ $json.output.severity }} não escalado — {{ $('Error Trigger').first().json.workflow.name }}",
+        "message": "=<p><strong>Severidade:</strong> {{ $json.output.severity }}</p> <p><strong>Motivo da IA não escalar:</strong> {{ $json.output.reason }}</p> <p><strong>Workflow:</strong> {{ $('Error Trigger').first().json.workflow.name }}</p> <p><strong>Erro:</strong> {{ $('Error Trigger').first().json.execution.error.message }}</p> <p><a href=\"{{ $('Error Trigger').first().json.execution.url }}\">Ver execução completa</a></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2720,
+        -96
+      ],
+      "id": "74fce709-4dac-4eff-a78f-1eacb86f653a",
+      "name": "Send a message",
+      "webhookId": "0afa4362-24b5-4505-aa38-3fc36942ab9f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "J69GFWskcOsZLX53",
+          "name": "API GMAIL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "NON-ESCALATED PATH NOTIFICATION: added after a practical test — ran a\nreal PetShop WhatsApp Bot error (database suspended for inactivity)\nthrough this pipeline instead of the default \"workflow ERROR\", to see\nhow W1 would react to a genuine incident, not just the synthetic test.\n\nThe AI classified it as severity=medium, escalate=false (reason: \"no\nsignificant financial impact or external visibility\") — but in\npractice, a customer messaging the bot and getting only a generic\nfallback reply IS a real production problem, even if not \"critical\"\nenough to wake someone up via WhatsApp.\n\nThis path (escalate=false) used to just log to the database and die\nsilently — nobody would ever know. Added this email to close that\ngap: a non-critical incident still generates a lightweight alert,\nwithout the cost of a full Claude Code diagnosis.\n",
+        "height": 384,
+        "width": 560
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2688,
+        80
+      ],
+      "id": "fdfdaa37-08a2-43e9-b4aa-83b9a1e54466",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    incident_id: $('Prepare AI Input').item.json.incident_id,\n    workflow_id: $('Edit Fields1').item.json.workflow_id,\n    workflow_name: $('Edit Fields1').item.json.workflow_name,\n    workflow_file: `workflows/${$('Edit Fields1').item.json.workflow_id}.json`,\n    node_name: $('Edit Fields1').item.json.node_name,\n    error_message: $('Edit Fields1').item.json.error_message,\n    execution_url: $('Edit Fields1').item.json.execution_url,\n    severity: $('Normalize Triage').item.json.output.severity,\n    reason: $('Normalize Triage').item.json.output.reason\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2944,
+        -320
+      ],
+      "id": "9ecd53ae-24b4-4df0-a4fd-30ff6bb20e07",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name, phone, permission_level FROM approvers WHERE active;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4320,
+        -320
+      ],
+      "id": "60c5be24-f485-49eb-8eb6-bf1b50986635",
+      "name": "Get Active Approvers",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO approval_tokens (incident_id, approver_id, token_hash, expires_at)\nVALUES ($1, $2, $3, now() + interval '48 hours');\n",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare AI Input').first().json.incident_id, $json.id, $json.token_hash] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4736,
+        -320
+      ],
+      "id": "6fba24cd-f5f1-4821-91c6-01e093dfdf91",
+      "name": "Insert Approval Token",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const crypto = require('crypto');\nconst severity = $('Normalize Triage').first().json.output.severity;\n\nconst level = $json.permission_level;\nlet capability = 'suggest_only';\nif (level === 'full') capability = 'approve';\nelse if (level === 'partial' && ['low'].includes(severity)) capability = 'approve';\n\nconst token = crypto.randomUUID();\nconst token_hash = crypto.createHash('sha256').update(token).digest('hex');\n\nreturn {\n  json: { ...$json, severity, capability, token, token_hash }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4528,
+        -320
+      ],
+      "id": "7cf340a0-b1e0-456c-b0d9-d2ff1fe65e19",
+      "name": "Generate Approver Tokens"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fail-open: se o classificador falhar ou devolver algo inválido, ESCALA por padrão.\nconst o = ($input.item.json || {}).output;\nconst valid = o && ['low', 'medium', 'high', 'critical'].includes(o.severity) && typeof o.escalate === 'boolean';\nreturn { json: { output: valid ? { ...o } : {\n  severity: 'high',\n  escalate: true,\n  reason: 'Classifier failed or returned invalid output; escalated by default (fail-open).',\n  source: 'fallback'\n} } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2392,
+        -144
+      ],
+      "id": "5a36a34f-0722-463c-9326-b236990cbc6b",
+      "name": "Normalize Triage"
     }
   ],
   "connections": {
@@ -990,7 +1097,7 @@
       "main": [
         [
           {
-            "node": "If1",
+            "node": "Normalize Triage",
             "type": "main",
             "index": 0
           }
@@ -1008,7 +1115,7 @@
         ],
         [
           {
-            "node": "Execute a SQL query2",
+            "node": "Send a message",
             "type": "main",
             "index": 0
           }
@@ -1019,18 +1126,7 @@
       "main": [
         [
           {
-            "node": "Build Incident File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Incident File": {
-      "main": [
-        [
-          {
-            "node": "Convert to File",
+            "node": "Code in JavaScript1",
             "type": "main",
             "index": 0
           }
@@ -1074,17 +1170,6 @@
       "main": [
         [
           {
-            "node": "Generate Token",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate Token": {
-      "main": [
-        [
-          {
             "node": "Save Diagnosis & Generate Token",
             "type": "main",
             "index": 0
@@ -1096,7 +1181,7 @@
       "main": [
         [
           {
-            "node": "Send Text",
+            "node": "Get Active Approvers",
             "type": "main",
             "index": 0
           }
@@ -1113,6 +1198,71 @@
           }
         ]
       ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Approvers": {
+      "main": [
+        [
+          {
+            "node": "Generate Approver Tokens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Approval Token": {
+      "main": [
+        []
+      ]
+    },
+    "Generate Approver Tokens": {
+      "main": [
+        [
+          {
+            "node": "Insert Approval Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Triage": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1123,7 +1273,14 @@
     "errorWorkflow": "NyMhXxnkyTbhmVQj",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "7872191e-a35c-498b-aa36-7b7210f2dc03",
-  "createdAt": "2026-07-26 21:57:59.207",
-  "updatedAt": "2026-07-27 16:49:59.053"
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "versionId": "477990d4-8132-41ed-9968-7226e4852eea",
+  "activeVersionId": "477990d4-8132-41ed-9968-7226e4852eea",
+  "versionCounter": 392,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": []
 }

@@ -1,6 +1,9 @@
 {
+  "updatedAt": "2026-10-27T23:23:51.559Z",
+  "createdAt": "2026-07-27T16:24:47.248Z",
   "id": "tKRpKt2eaS92AOnk",
   "name": "W-Digest - Daily Summary",
+  "description": null,
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -26,7 +29,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n  COUNT(*) AS total_count,\n  COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count,\n  COUNT(*) FILTER (WHERE severity = 'high') AS high_count,\n  COUNT(*) FILTER (WHERE severity = 'medium') AS medium_count,\n  COUNT(*) FILTER (WHERE severity = 'low') AS low_count,\n  COUNT(*) FILTER (WHERE status = 'logged') AS logged_count\nFROM incidents\nWHERE created_at > now() - interval '24 hours';\n",
+        "query": "WITH s AS (\n  SELECT\n    COUNT(*) AS total_count,\n    COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count,\n    COUNT(*) FILTER (WHERE severity = 'high') AS high_count,\n    COUNT(*) FILTER (WHERE severity = 'medium') AS medium_count,\n    COUNT(*) FILTER (WHERE severity = 'low') AS low_count,\n    COUNT(*) FILTER (WHERE status = 'logged') AS logged_count\n  FROM incidents\n  WHERE created_at > now() - interval '24 hours'\n)\nSELECT a.phone, s.*\nFROM approvers a CROSS JOIN s\nWHERE a.active;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -48,7 +51,7 @@
       "parameters": {
         "resource": "messages-api",
         "instanceName": "testeN8N",
-        "remoteJid": "5511999999999",
+        "remoteJid": "={{ $json.phone }}",
         "messageText": "=📊 *Daily Digest — Last 24h*  Total incidents: {{ $json.total_count }} \n🔴 Critical: {{ $json.critical_count }} \n🟠 High: {{ $json.high_count }} \n🟡 Medium: {{ $json.medium_count }} \n🟢 Low: {{ $json.low_count }}  \nLogged (not escalated): {{ $json.logged_count }}",
         "options_message": {}
       },
@@ -65,7 +68,8 @@
           "id": "sBgmDLxmg8tMefir",
           "name": "Evolution account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -110,9 +114,17 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "errorWorkflow": "NyMhXxnkyTbhmVQj"
   },
-  "versionId": "4b591d32-c864-489c-8c53-9c7d214a4731",
-  "createdAt": "2026-07-27 16:24:47.248",
-  "updatedAt": "2026-07-27 16:50:53.580"
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "versionId": "499f1fbb-85bc-47e5-a67c-b7f4ea4311eb",
+  "activeVersionId": "499f1fbb-85bc-47e5-a67c-b7f4ea4311eb",
+  "versionCounter": 20,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": []
 }

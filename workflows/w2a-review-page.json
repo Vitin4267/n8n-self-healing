@@ -1,0 +1,287 @@
+{
+  "updatedAt": "2026-10-27T23:11:02.877Z",
+  "createdAt": "2026-07-27T14:58:35.644Z",
+  "id": "qUB0JOdrxaUAP7C7",
+  "name": "W2a - Review Page",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "heal-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1c981d46-18f0-4465-89be-5db6199b5221",
+      "name": "Webhook",
+      "webhookId": "ff1e2832-abdb-46f1-8b22-59da8fb34bad"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT i.id, i.diagnosis_json, i.workflow_name, i.node_name, i.error_message, i.severity,\n       a.name AS approver_name, a.permission_level,\n       (a.permission_level = 'full' OR (a.permission_level = 'partial' AND i.severity = 'low')) AS can_approve\nFROM approval_tokens t\nJOIN approvers a ON a.id = t.approver_id AND a.active\nJOIN incidents i ON i.id = t.incident_id\nWHERE t.incident_id::text = $1\n  AND t.token_hash = encode(sha256(convert_to($2,'UTF8')),'hex')\n  AND t.used_at IS NULL\n  AND t.expires_at > now()\n  AND i.status = 'awaiting_approval'\n  AND i.decided_by IS NULL\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [String($json.query.incident || ''), String($json.query.token || '')] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "65d7ed96-a7fe-4f80-87d7-c2aab370978e",
+      "name": "Lookup Review Access",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "299eea5e-beb8-43c2-924d-2eeaf8bfa7e6",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "7aa896ce-8d1d-45fc-b109-191d40bad656",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<html>\n<body style=\"font-family: sans-serif; text-align: center; padding: 60px;\">\n  <h1>⚠️ Invalid or Expired Link</h1>\n  <p>This approval link is no longer valid. It may have expired (48h) or already been used.</p>\n</body>\n</html>\n",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              },
+              {
+                "name": "Content-Security-Policy",
+                "value": "default-src 'none'; style-src 'unsafe-inline'; form-action http://localhost:5678"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        176
+      ],
+      "id": "32a6ec3f-81fa-4135-b542-bf2d2731c6ab",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = (v) => String(v ?? '')\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')\n  .replace(/\"/g, '&quot;').replace(/'/g, '&#39;');\n\nlet diagnosis = {};\ntry { diagnosis = JSON.parse($json.diagnosis_json || '{}'); } catch (e) { diagnosis = { root_cause: '(diagnóstico ilegível)' }; }\n\nconst incidentId = esc($json.id);\nconst token = esc($('Webhook').item.json.query.token);\nconst canApprove = $json.can_approve === true;\n\nconst hidden = (action) => `\n      <input type=\"hidden\" name=\"incident\" value=\"${incidentId}\">\n      <input type=\"hidden\" name=\"token\" value=\"${token}\">\n      <input type=\"hidden\" name=\"action\" value=\"${action}\">`;\n\nconst decisionButtons = canApprove ? `\n    <form method=\"POST\" action=\"http://localhost:5678/webhook/heal-decide\" style=\"display:inline;\">${hidden('approve')}\n      <button type=\"submit\" style=\"background:#22c55e;color:white;padding:10px 20px;border:none;border-radius:6px;font-size:16px;\">✅ Approve</button>\n    </form>\n    <form method=\"POST\" action=\"http://localhost:5678/webhook/heal-decide\" style=\"display:inline; margin-left:10px;\">${hidden('reject')}\n      <button type=\"submit\" style=\"background:#ef4444;color:white;padding:10px 20px;border:none;border-radius:6px;font-size:16px;\">❌ Reject</button>\n    </form>` : `\n    <p style=\"background:#fef3c7;padding:12px;border-radius:6px;\">\n      👀 Seu nível (<strong>${esc($json.permission_level)}</strong>) não permite aprovar um incidente de severidade\n      <strong>${esc($json.severity)}</strong>. Você pode deixar uma sugestão para quem aprova.\n    </p>`;\n\nconst html = `<!doctype html>\n<html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>\n<body style=\"font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px;\">\n  <h1>🔍 Incident Review</h1>\n  <p><em>Olá, ${esc($json.approver_name)} (${esc($json.permission_level)})</em></p>\n  <p><strong>Workflow:</strong> ${esc($json.workflow_name)}</p>\n  <p><strong>Node:</strong> ${esc($json.node_name)}</p>\n  <p><strong>Severity:</strong> ${esc($json.severity)}</p>\n  <p><strong>Error:</strong> ${esc($json.error_message)}</p>\n  <hr>\n  <p><strong>Root cause:</strong> ${esc(diagnosis.root_cause)}</p>\n  <p><strong>Proposed fix:</strong> ${esc(diagnosis.proposed_fix || 'None identified')}</p>\n  <p><strong>Risk:</strong> ${esc(diagnosis.risk)} | <strong>Confidence:</strong> ${esc(diagnosis.confidence)}</p>\n  <div style=\"margin-top: 30px;\">${decisionButtons}\n  </div>\n  <hr style=\"margin-top:40px\">\n  <form method=\"POST\" action=\"http://localhost:5678/webhook/heal-decide\">${hidden('suggest')}\n    <p><strong>💬 Sugestão</strong> (não aprova nem consome o link)</p>\n    <textarea name=\"suggestion\" rows=\"4\" maxlength=\"2000\" style=\"width:100%;\" required></textarea>\n    <button type=\"submit\" style=\"margin-top:8px;padding:8px 16px;\">Enviar sugestão</button>\n  </form>\n</body></html>`;\n\nreturn [{ json: { html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -208
+      ],
+      "id": "2d0d4200-9cb1-4cf6-a324-a94f84d2468d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              },
+              {
+                "name": "Content-Security-Policy",
+                "value": "default-src 'none'; style-src 'unsafe-inline'; form-action http://localhost:5678"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        848,
+        -208
+      ],
+      "id": "255ffa47-0f9b-4279-b166-e65f8bc8ae27",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "content": "REVIEW PAGE (GET only — never changes state): validates the token\n(matches, not expired, still awaiting_approval) against the DB, purely\nread-only. Immune to email/link-scanner prefetch auto-approving things.",
+        "height": 172,
+        "width": 452
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -224
+      ],
+      "id": "8c1babf5-f244-419d-aa49-6cd0256a9a7f",
+      "name": "Note-502a482d"
+    },
+    {
+      "parameters": {
+        "content": "True path: builds the HTML page from the approved diagnosis (root\ncause, proposed fix) with two <form> buttons that POST to W2b's\n/heal-decide webhook, carrying incident+token+action as hidden fields.",
+        "height": 172,
+        "width": 444
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        -432
+      ],
+      "id": "535c644e-5467-4974-84f5-a2295945967d",
+      "name": "Note-57570af1"
+    },
+    {
+      "parameters": {
+        "content": "False path: token invalid, expired, or already used — shows a\nsimple \"link no longer valid\" page instead.",
+        "height": 100,
+        "width": 380
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        576,
+        320
+      ],
+      "id": "22ee1f21-cfcd-4e51-973c-f2c8afd1a536",
+      "name": "Note-29905444"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Lookup Review Access",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Review Access": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "NyMhXxnkyTbhmVQj",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "versionId": "96f7f6a0-ea6c-4823-b332-c6d12a49a909",
+  "activeVersionId": "96f7f6a0-ea6c-4823-b332-c6d12a49a909",
+  "versionCounter": 44,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": []
+}

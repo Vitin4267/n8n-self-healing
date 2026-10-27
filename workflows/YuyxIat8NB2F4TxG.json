@@ -1,6 +1,9 @@
 {
+  "updatedAt": "2026-10-27T23:22:41.404Z",
+  "createdAt": "2026-07-27T15:36:21.151Z",
   "id": "YuyxIat8NB2F4TxG",
   "name": "W2b - Approve & Fix",
+  "description": null,
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -23,73 +26,18 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE incidents\nSET token_used = true\nWHERE id = $1\n  AND approval_token = $2\n  AND status = 'awaiting_approval'\n  AND expires_at > now()\n  AND token_used = false\nRETURNING id, diagnosis_json, workflow_id, workflow_name, node_name;\n",
-        "options": {
-          "queryReplacement": "={{ [$json.body.incident, $json.body.token] }}"
-        }
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        208,
-        0
-      ],
-      "id": "b3439981-a8f9-40fe-8270-32da5a5f3785",
-      "name": "Execute a SQL query",
-      "alwaysOutputData": true,
-      "credentials": {
-        "postgres": {
-          "id": "52EskqeODOD50WcM",
-          "name": "Postgres account 2"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "ba1c30ed-53ed-4b9e-833d-71555c0c5b06",
-              "leftValue": "={{ $json.id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "looseTypeValidation": true,
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        416,
-        0
-      ],
-      "id": "db16718a-e3da-4b2d-839f-59346d11adb2",
-      "name": "If"
-    },
-    {
-      "parameters": {
         "respondWith": "text",
-        "responseBody": "<html>\n<body style=\"font-family: sans-serif; text-align: center; padding: 60px;\">\n  <h1>⚠️ Invalid or Expired Link</h1>\n  <p>This approval link is no longer valid. It may have expired (48h) or already been used.</p>\n</body>\n</html>",
+        "responseBody": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body style=\"font-family: sans-serif; text-align: center; padding: 60px;\"><h1>⚠️ Ação não permitida</h1><p>O link é inválido, expirou (48h), já foi usado, outro aprovador já decidiu, ou seu nível não permite esta ação para este incidente.</p></body></html>",
         "options": {
           "responseHeaders": {
             "entries": [
               {
                 "name": "Content-Type",
-                "value": "text/html"
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
               }
             ]
           }
@@ -98,8 +46,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        624,
-        192
+        1040,
+        416
       ],
       "id": "0e4b6b83-3a20-47e1-a95a-c21ce746c9c0",
       "name": "Respond to Webhook"
@@ -122,8 +70,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        640,
-        -160
+        1040,
+        -96
       ],
       "id": "8389df5c-fdef-48db-b4ca-2286390d9694",
       "name": "Respond to Webhook1"
@@ -140,7 +88,7 @@
           "conditions": [
             {
               "id": "8a880a01-47b8-485a-972b-d06ef6dfc68f",
-              "leftValue": "={{ $('Webhook').item.json.body.action }}",
+              "leftValue": "={{ $('Validate Input').item.json.action }}",
               "rightValue": "approve",
               "operator": {
                 "type": "string",
@@ -156,8 +104,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        816,
-        -160
+        1216,
+        -96
       ],
       "id": "0ab2174d-286f-450c-8f3c-9c329d8e242d",
       "name": "If1"
@@ -169,8 +117,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1024,
-        -320
+        1392,
+        -240
       ],
       "id": "29c9d114-a86c-42fe-b158-0d14d5623743",
       "name": "Prepare Fix Incident File"
@@ -183,8 +131,8 @@
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
       "position": [
-        1184,
-        -320
+        1552,
+        -240
       ],
       "id": "caf970e2-1034-4af0-976c-34d58c529197",
       "name": "Convert to File"
@@ -192,40 +140,40 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "/home/user/projects/n8n-self-healing/.incident/current.json",
+        "fileName": "=/home/victor-ferrareto-dias/projects/n8n-self-healing/.incident/incident-{{ $('Prepare Fix Incident File').item.json.incident_id }}.json",
         "options": {}
       },
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        1344,
-        -320
+        1712,
+        -240
       ],
       "id": "cbeb91e4-feb6-46aa-bae5-543a768e4a13",
       "name": "Read/Write Files from Disk"
     },
     {
       "parameters": {
-        "command": "=flock -w 300 /var/lock/heal.lock -c '\ncd /home/user/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\ngit checkout -B fix/incident-{{ $(\"Prepare Fix Incident File\").item.json.incident_id }} && \\\nclaude -p \"$(cat prompts/fix.md)\" \\\n  --allowedTools \"Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*)\" \\\n  --output-format json --max-turns 40'\n"
+        "command": "=flock -w 300 /var/lock/heal.lock -c '\ncd /home/victor-ferrareto-dias/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\ncp .incident/incident-{{ $(\"Prepare Fix Incident File\").item.json.incident_id }}.json .incident/current.json && \\\ngit checkout -B fix/incident-{{ $(\"Prepare Fix Incident File\").item.json.incident_id }} && \\\nclaude -p \"$(cat prompts/fix.md)\" \\\n  --allowedTools \"Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*)\" \\\n  --output-format json --max-turns 40'\n"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1520,
-        -320
+        1888,
+        -240
       ],
       "id": "c8c20c49-ea29-4c59-9f00-aa1e49ed00c2",
       "name": "Execute Command"
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.stdout;\nconst lines = raw.trim().split('\\n').reverse();\nconst jsonLine = lines.find(l => l.trim().startsWith('{'));\nconst envelope = JSON.parse(jsonLine);\n\nlet resultText = envelope.result.trim();\nconst fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\nif (fenceMatch) {\n  resultText = fenceMatch[1].trim();\n}\nconst fixResult = JSON.parse(resultText);\n\nreturn [{\n  json: {\n    status: fixResult.status,\n    branch: fixResult.branch,\n    pr_url: fixResult.pr_url,\n    commit: fixResult.commit,\n    abort_reason: fixResult.abort_reason,\n    cost_usd: envelope.total_cost_usd\n  }\n}];\n"
+        "jsCode": "const raw = $json.stdout;\nconst lines = raw.trim().split('\\n').reverse();\nconst jsonLine = lines.find(l => l.trim().startsWith('{'));\nconst envelope = JSON.parse(jsonLine);\n\nlet resultText = envelope.result.trim();\nconst fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\nif (fenceMatch) {\n  resultText = fenceMatch[1].trim();\n}\n\nlet fixResult;\ntry {\n  fixResult = JSON.parse(resultText);\n} catch (e) {\n  // Claude didn't return clean JSON (e.g. a tool call got blocked and it\n  // explained in prose instead) — don't let this die silently. Surface the\n  // raw explanation so the human still gets notified with something\n  // actionable, instead of the whole execution erroring out with no message.\n  fixResult = {\n    status: 'needs_manual_review',\n    branch: null,\n    pr_url: null,\n    commit: null,\n    abort_reason: resultText\n  };\n}\n\nreturn [{\n  json: {\n    status: fixResult.status,\n    branch: fixResult.branch,\n    pr_url: fixResult.pr_url,\n    commit: fixResult.commit,\n    abort_reason: fixResult.abort_reason,\n    cost_usd: envelope.total_cost_usd\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1664,
-        -320
+        2048,
+        -240
       ],
       "id": "0fe6589c-2c25-44a5-b14d-e1cc54b6a29b",
       "name": "Parse PR Result"
@@ -241,8 +189,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1824,
-        -320
+        2208,
+        -240
       ],
       "id": "f352ef42-3032-43c0-83bd-f44599193ef5",
       "name": "Execute a SQL query1",
@@ -257,15 +205,15 @@
       "parameters": {
         "resource": "messages-api",
         "instanceName": "testeN8N",
-        "remoteJid": "5511999999999",
-        "messageText": "={{ $('Parse PR Result').item.json.status === 'pr_created' ? '✅ *Fix Applied!*\\n\\nPR opened: ' + $('Parse PR Result').item.json.pr_url : '⚠️ *Fix Aborted*\\n\\nReason: ' + $('Parse PR Result').item.json.abort_reason }}\n",
+        "remoteJid": "={{ $json.phone }}",
+        "messageText": "={{ $('Parse PR Result').first().json.status === 'pr_created' ? '✅ *Fix Applied!*\\n\\nPR opened: ' + $('Parse PR Result').first().json.pr_url : '⚠️ *Fix Aborted*\\n\\nReason: ' + $('Parse PR Result').first().json.abort_reason }}\n",
         "options_message": {}
       },
       "type": "n8n-nodes-evolution-api.evolutionApi",
       "typeVersion": 1,
       "position": [
-        1984,
-        -320
+        2528,
+        -240
       ],
       "id": "b532fd34-bb39-458a-a714-280ac952464a",
       "name": "Enviar texto",
@@ -274,30 +222,8 @@
           "id": "sBgmDLxmg8tMefir",
           "name": "Evolution account"
         }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE incidents SET status = 'rejected' WHERE id = $1;\n",
-        "options": {
-          "queryReplacement": "={{ [$json.id] }}"
-        }
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
-      "position": [
-        1024,
-        -16
-      ],
-      "id": "1c8afe21-f4e0-425f-ba43-e789edf14168",
-      "name": "Execute a SQL query2",
-      "credentials": {
-        "postgres": {
-          "id": "52EskqeODOD50WcM",
-          "name": "Postgres account 2"
-        }
-      }
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -358,6 +284,255 @@
       ],
       "id": "64e9f6b7-c2e1-428c-9706-056207aa0dee",
       "name": "Note-8bc53fe6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nconst a = String(b.action || '');\nconst kind = a === 'suggest' ? 'suggest' : (a === 'approve' || a === 'reject') ? 'decide' : 'invalid';\nreturn [{ json: {\n  incident: String(b.incident || '').slice(0, 12),\n  token: String(b.token || '').slice(0, 100),\n  action: a,\n  kind,\n  text: String(b.suggestion || '').trim().slice(0, 2000)\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "3f546a8a-eb22-490b-9949-5b9c4cb8ad14",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4246a725-1a46-4bc9-9c70-3d5937edabc8",
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "suggest",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "ec69937e-0321-4e8e-a4ef-3e06dd7dd517",
+      "name": "Is Suggestion?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8dfe6ba4-429b-486f-8b0a-5f2971e3c8a0",
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "decide",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        160
+      ],
+      "id": "8f4960e0-6017-440a-9b7e-6df58b48ff92",
+      "name": "Is Decision?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH eligible AS (\n  SELECT t.id AS token_id, t.approver_id\n  FROM approval_tokens t\n  JOIN approvers a ON a.id = t.approver_id AND a.active\n  JOIN incidents i ON i.id = t.incident_id\n  WHERE t.incident_id::text = $1\n    AND t.token_hash = encode(sha256(convert_to($2,'UTF8')),'hex')\n    AND t.used_at IS NULL\n    AND t.expires_at > now()\n    AND i.status = 'awaiting_approval'\n    AND i.decided_by IS NULL\n    AND (a.permission_level = 'full' OR (a.permission_level = 'partial' AND i.severity = 'low'))\n  FOR UPDATE OF i, t\n), won AS (\n  UPDATE incidents i\n  SET decided_by = e.approver_id, decided_at = now(), token_used = true, updated_at = now(),\n      status = CASE WHEN $3 = 'approve' THEN i.status ELSE 'rejected' END\n  FROM eligible e\n  WHERE i.id::text = $1 AND i.decided_by IS NULL\n  RETURNING i.id, i.diagnosis_json, i.workflow_id, i.workflow_name, i.node_name, e.approver_id\n), burn AS (\n  UPDATE approval_tokens SET used_at = now()\n  WHERE incident_id::text = $1 AND used_at IS NULL AND EXISTS (SELECT 1 FROM won)\n  RETURNING id\n)\nSELECT w.*, (SELECT count(*) FROM burn) AS tokens_burned FROM won w;",
+        "options": {
+          "queryReplacement": "={{ [$json.incident, $json.token, $json.kind === 'suggest' ? $json.text : $json.action] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        0
+      ],
+      "id": "429cee63-79ab-4e16-9172-f4ab9ade1759",
+      "name": "Authorize & Decide",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO incident_suggestions (incident_id, approver_id, body)\nSELECT i.id, a.id, $3\nFROM approval_tokens t\nJOIN approvers a ON a.id = t.approver_id AND a.active\nJOIN incidents i ON i.id = t.incident_id\nWHERE t.incident_id::text = $1\n  AND t.token_hash = encode(sha256(convert_to($2,'UTF8')),'hex')\n  AND t.used_at IS NULL\n  AND t.expires_at > now()\n  AND i.status = 'awaiting_approval'\n  AND i.decided_by IS NULL\n  AND length($3) > 0\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [$json.incident, $json.token, $json.kind === 'suggest' ? $json.text : $json.action] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        320
+      ],
+      "id": "bb7446db-e6c3-4d8b-8e94-319a0b933913",
+      "name": "Save Suggestion",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ab4cdd20-5384-4a44-a5c8-4d52e97adb70",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        320
+      ],
+      "id": "a9a399aa-9d57-4feb-86c0-fda74496d965",
+      "name": "Suggestion Saved?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ba1c30ed-53ed-4b9e-833d-71555c0c5b06",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        832,
+        0
+      ],
+      "id": "6a621fc5-ada6-4854-9b1d-3a24c9089a3e",
+      "name": "Decision Accepted?"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body style=\"font-family: sans-serif; text-align: center; padding: 60px;\"><h1>💬 Sugestão registrada</h1><p>Obrigado! Quem tem permissão de aprovar vai ver sua sugestão.</p></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        224
+      ],
+      "id": "645f90dd-e357-4243-ad6e-fe82d0e6e4bb",
+      "name": "Respond Suggestion Saved"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT phone FROM approvers WHERE active;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2368,
+        -240
+      ],
+      "id": "a464bb22-8181-4d1c-a9f5-ab6e950aa2b8",
+      "name": "Get Active Approvers",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      },
+      "alwaysOutputData": true
     }
   ],
   "connections": {
@@ -365,25 +540,101 @@
       "main": [
         [
           {
-            "node": "Execute a SQL query",
+            "node": "Validate Input",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Execute a SQL query": {
+    "Validate Input": {
       "main": [
         [
           {
-            "node": "If",
+            "node": "Is Suggestion?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "If": {
+    "Is Suggestion?": {
+      "main": [
+        [
+          {
+            "node": "Save Suggestion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Decision?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Decision?": {
+      "main": [
+        [
+          {
+            "node": "Authorize & Decide",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Suggestion": {
+      "main": [
+        [
+          {
+            "node": "Suggestion Saved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggestion Saved?": {
+      "main": [
+        [
+          {
+            "node": "Respond Suggestion Saved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorize & Decide": {
+      "main": [
+        [
+          {
+            "node": "Decision Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision Accepted?": {
       "main": [
         [
           {
@@ -421,13 +672,7 @@
             "index": 0
           }
         ],
-        [
-          {
-            "node": "Execute a SQL query2",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Prepare Fix Incident File": {
@@ -489,6 +734,17 @@
       "main": [
         [
           {
+            "node": "Get Active Approvers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Approvers": {
+      "main": [
+        [
+          {
             "node": "Enviar texto",
             "type": "main",
             "index": 0
@@ -505,7 +761,14 @@
     "errorWorkflow": "NyMhXxnkyTbhmVQj",
     "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "ed0e9538-2929-4352-88fe-74917f645231",
-  "createdAt": "2026-07-27 15:36:21.151",
-  "updatedAt": "2026-07-27 16:50:42.072"
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "versionId": "26bbd2e3-2b1c-4a24-a6e3-0c414a8aa9f7",
+  "activeVersionId": "26bbd2e3-2b1c-4a24-a6e3-0c414a8aa9f7",
+  "versionCounter": 95,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": []
 }
