@@ -29,9 +29,17 @@ NODE_BIN="$(sudo -u "${SUDO_USER:-root}" bash -lc 'command -v node')"
 id "$SVC" >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "$SVC"
 
 install -d -m 755 -o root -g root "$OPT" "$OPT/bin"
-( cd "$SRC" && sudo -u "${SUDO_USER:-root}" npm ci --omit=dev --no-audit --no-fund >/dev/null && sudo -u "${SUDO_USER:-root}" npm run build >/dev/null )
+BUILD_AS="${SUDO_USER:-root}"
+# 1) build with the dev dependencies (tsc), as the unprivileged owner of the checkout
+sudo -u "$BUILD_AS" bash -lc "cd '$SRC' && npm ci --no-audit --no-fund >/dev/null && npm run build >/dev/null"
+# 2) production-only node_modules, installed in a scratch dir so the dev checkout stays untouched
+STAGE="$(mktemp -d)"
+cp "$SRC/package.json" "$SRC/package-lock.json" "$STAGE/"
+chown "$BUILD_AS" "$STAGE"
+sudo -u "$BUILD_AS" bash -lc "cd '$STAGE' && npm ci --omit=dev --no-audit --no-fund >/dev/null"
 rm -rf -- "${OPT:?}/dist" "${OPT:?}/node_modules"
-cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/package.json" "$OPT/"
+cp -r "$SRC/dist" "$STAGE/node_modules" "$SRC/package.json" "$OPT/"
+rm -rf -- "${STAGE:?}"
 install -m 755 "$NODE_BIN" "$OPT/bin/node"
 chown -R root:root "$OPT"
 
