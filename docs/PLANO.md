@@ -53,18 +53,19 @@ Um recibo, sozinho, nunca libera a Fase 2 do Claude.
 - [x] 48 testes (conformidade campo a campo com o `createSignedReceipt` real, 19 de adulteração, concorrência, HTTP)
 - [x] Instalação **endurecida** (usuário `boundaryattest`, unit com sandbox) — isolamento verificado: meu usuário recebe "Permissão negada"
 - [ ] `[!]` Apagar as cópias antigas sem privilégio: `rm -r ~/.config/n8n-self-healing-attest ~/.local/share/n8n-self-healing-attest`
-- [~] Credencial do n8n (`Header Auth account 3`): criada, mas o campo **Name** está `Receipt Service` — tem de ser `Authorization`
+- [x] Credencial do n8n (`Header Auth account 3`) funcionando (2 erros de configuração achados e corrigidos: **Name** = `Authorization`; **Value** = `Bearer ` + token, com espaço)
 
-## Fase 4 — recibos de triagem e diagnóstico  `[~]`
+## Fase 4 — recibos de triagem e diagnóstico  `[x]`
 - [x] `Build/Record/Request` de **triage** no W1 (ramo acima do fluxo principal, `onError: continue`)
 - [x] `Record/Request` de **diagnosis** no W1 (evento amarrado à `diagnosis_version`)
 - [x] Reconciliador `W-Receipts-Reconcile` (a cada 5 min emite recibos pendentes; idempotente)
 - [x] Bug achado no teste: o n8n bloqueia a palavra `caller` em expressões → o evento de triagem não era gravado (campo renomeado para `actor`); agora os **2 eventos** são gravados (incidente 95)
 - [x] Teste: serviço/credencial fora → pipeline continua até `awaiting_approval`, eventos gravados, recibos **pendentes** (incidentes 94 e 95; `audit` mostra `pending`, não esconde)
-- [ ] Teste: recuperação → reconciliador emite, **sem repetir** triagem/diagnóstico
-- [ ] Teste: `audit` do incidente verifica tudo com as chaves do repo
+- [x] Teste: recuperação → o reconciliador emitiu os 3 recibos pendentes, **sem repetir** triagem/diagnóstico (eventos gravados 02:02–02:04 com o serviço inacessível; recibos às 02:15)
+- [x] Teste: `audit` verifica tudo com as chaves do repo (incidentes 94, 95 e 96)
+- [x] Caminho feliz: recibo de triagem em ~5 s e o de diagnóstico ao terminar, sem depender do reconciliador (incidente 96)
 - [x] Workflows exportados (sanitizados) para o repo
-- [ ] Atualizar doc da Fase 4 e publicar
+- [x] Dados de teste removidos (ledger vazio, 4/4 gatilhos ativos)
 
 ## Fase 5 — aprovação + bloqueio antes da execução  `[ ]`
 - [ ] Gravar o evento `approval` **na mesma transação** que consome o token (nível, severidade, capability, token_ref, hash do diagnóstico)
