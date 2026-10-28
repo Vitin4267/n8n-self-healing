@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-28T00:31:30.712Z",
+  "updatedAt": "2026-10-28T00:54:18.362Z",
   "createdAt": "2026-07-27T15:36:21.151Z",
   "id": "YuyxIat8NB2F4TxG",
   "name": "W2b - Approve & Fix",
@@ -112,7 +112,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const diagnosis = JSON.parse($json.diagnosis_json);\n\nreturn [{\n  json: {\n    incident_id: $json.id,\n    workflow_id: $json.workflow_id,\n    workflow_file: `workflows/${$json.workflow_id}.json`,\n    diagnosis: {\n      root_cause: diagnosis.root_cause,\n      proposed_fix: diagnosis.proposed_fix,\n      files_to_change: diagnosis.files_to_change\n    }\n  }\n}];\n"
+        "jsCode": "const diagnosis = JSON.parse($json.diagnosis_json);\n\nreturn [{\n  json: {\n    incident_id: $json.id,\n    workflow_id: $json.workflow_id,\n    approved_by: $json.approver_id,\n    diagnosis_hash: $json.diagnosis_hash,\n    source_commit: $json.source_commit,\n    workflow_file: `workflows/${$json.workflow_id}.json`,\n    diagnosis: {\n      root_cause: diagnosis.root_cause,\n      proposed_fix: diagnosis.proposed_fix,\n      files_to_change: diagnosis.files_to_change\n    }\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -154,7 +154,7 @@
     },
     {
       "parameters": {
-        "command": "=flock -w 300 /var/lock/heal.lock -c '\ncd /home/victor-ferrareto-dias/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\ncp .incident/incident-{{ $(\"Prepare Fix Incident File\").item.json.incident_id }}.json .incident/current.json && \\\ngit checkout -B fix/incident-{{ $(\"Prepare Fix Incident File\").item.json.incident_id }} && \\\nclaude -p \"$(cat prompts/fix.md)\" \\\n  --allowedTools \"Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*)\" \\\n  --output-format json --max-turns 40'\n"
+        "command": "=bash /home/victor-ferrareto-dias/projects/n8n-self-healing/services/heal-run.sh fix {{ $(\"Prepare Fix Incident File\").item.json.incident_id }}"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -168,7 +168,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const failed = (why) => [{ json: {\n  status: 'needs_manual_review', branch: null, pr_url: null, commit: null,\n  abort_reason: why, cost_usd: null\n} }];\n\ntry {\n  const raw = String($json.stdout || '');\n  if (!raw.trim()) {\n    return failed('Fix agent produced no output' + ($json.stderr ? ': ' + String($json.stderr).slice(0, 200) : ''));\n  }\n  const lines = raw.trim().split('\\n').reverse();\n  const jsonLine = lines.find(l => l.trim().startsWith('{'));\n  if (!jsonLine) return failed('No JSON envelope in fix agent output');\n  const envelope = JSON.parse(jsonLine);\n\n  let resultText = String(envelope.result || '').trim();\n  const fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\n  if (fenceMatch) {\n    resultText = fenceMatch[1].trim();\n  }\n\n  let fixResult;\n  try {\n    fixResult = JSON.parse(resultText);\n  } catch (e) {\n    // Claude didn't return clean JSON (e.g. a tool call got blocked and it\n    // explained in prose instead) — surface the raw explanation so the human\n    // still gets notified with something actionable.\n    fixResult = { status: 'needs_manual_review', branch: null, pr_url: null, commit: null, abort_reason: resultText };\n  }\n\n  return [{\n    json: {\n      status: fixResult.status,\n      branch: fixResult.branch,\n      pr_url: fixResult.pr_url,\n      commit: fixResult.commit,\n      abort_reason: fixResult.abort_reason,\n      cost_usd: envelope.total_cost_usd\n    }\n  }];\n} catch (e) {\n  return failed('Could not parse fix agent output: ' + String(e.message).slice(0, 200));\n}\n"
+        "jsCode": "const raw = String($json.stdout || '');\nconst meta = (raw.match(/^META .*$/gm) || []).join(' ');\nconst get = (k) => (meta.match(new RegExp('\\\\b' + k + '=(\\\\S+)')) || [])[1] || null;\nconst violation = get('scope_violation');\nconst outOfScope = violation && violation !== 'none' ? violation : null;\n\nconst build = (r, costUsd) => {\n  let status = r.status;\n  let reason = r.abort_reason || '';\n  // The approved diagnosis lists the files that may change; anything else needs a human.\n  if (outOfScope) {\n    status = 'needs_manual_review';\n    reason = (outOfScope === 'check_failed' ? 'The automatic scope check could not run, so the changed files were NOT verified. ' : `Changes outside the approved scope: ${outOfScope}. `) + (r.pr_url ? `Do NOT merge ${r.pr_url} before reviewing. ` : '') + reason;\n  }\n  let message;\n  if (status === 'pr_created') message = '✅ *Fix Applied!*\\n\\nPR opened: ' + r.pr_url;\n  else if (status === 'needs_manual_review') message = '⚠️ *Needs manual review*\\n\\n' + (r.pr_url ? 'PR: ' + r.pr_url + '\\n\\n' : '') + reason;\n  else message = '⚠️ *Fix Aborted*\\n\\nReason: ' + reason;\n  return [{ json: { status, branch: r.branch ?? null, pr_url: r.pr_url ?? null, commit: r.commit ?? null,\n                    abort_reason: reason, cost_usd: costUsd, out_of_scope: outOfScope, message } }];\n};\n\ntry {\n  if (!raw.trim()) {\n    return build({ status: 'needs_manual_review', abort_reason: 'Fix agent produced no output' + ($json.stderr ? ': ' + String($json.stderr).slice(0, 200) : '') }, null);\n  }\n  const lines = raw.trim().split('\\n').reverse();\n  const jsonLine = lines.find(l => l.trim().startsWith('{'));\n  if (!jsonLine) return build({ status: 'needs_manual_review', abort_reason: 'No JSON envelope in fix agent output' }, null);\n  const envelope = JSON.parse(jsonLine);\n\n  let resultText = String(envelope.result || '').trim();\n  const fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\n  if (fenceMatch) {\n    resultText = fenceMatch[1].trim();\n  }\n\n  let fixResult;\n  try {\n    fixResult = JSON.parse(resultText);\n  } catch (e) {\n    // Claude didn't return clean JSON (e.g. a tool call got blocked and it\n    // explained in prose instead) — surface the raw explanation so the human\n    // still gets notified with something actionable.\n    fixResult = { status: 'needs_manual_review', abort_reason: resultText };\n  }\n  return build(fixResult, envelope.total_cost_usd);\n} catch (e) {\n  return build({ status: 'needs_manual_review', abort_reason: 'Could not parse fix agent output: ' + String(e.message).slice(0, 200) }, null);\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -207,7 +207,7 @@
         "resource": "messages-api",
         "instanceName": "testeN8N",
         "remoteJid": "={{ $json.phone }}",
-        "messageText": "={{ $('Parse PR Result').first().json.status === 'pr_created' ? '✅ *Fix Applied!*\\n\\nPR opened: ' + $('Parse PR Result').first().json.pr_url : '⚠️ *Fix Aborted*\\n\\nReason: ' + $('Parse PR Result').first().json.abort_reason }}\n",
+        "messageText": "={{ $('Parse PR Result').first().json.message }}",
         "options_message": {}
       },
       "type": "n8n-nodes-evolution-api.evolutionApi",
@@ -288,7 +288,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body || {};\nconst a = String(b.action || '');\nconst kind = a === 'suggest' ? 'suggest' : (a === 'approve' || a === 'reject') ? 'decide' : 'invalid';\nreturn [{ json: {\n  incident: String(b.incident || '').slice(0, 12),\n  token: String(b.token || '').slice(0, 100),\n  action: a,\n  kind,\n  text: String(b.suggestion || '').trim().slice(0, 2000)\n} }];"
+        "jsCode": "const b = $json.body || {};\nconst a = String(b.action || '');\nconst kind = a === 'suggest' ? 'suggest' : (a === 'approve' || a === 'reject') ? 'decide' : 'invalid';\nreturn [{ json: {\n  incident: String(b.incident || '').slice(0, 12),\n  token: String(b.token || '').slice(0, 100),\n  diagnosis_hash: String(b.diagnosis_hash || '').slice(0, 64),\n  action: a,\n  kind,\n  text: String(b.suggestion || '').trim().slice(0, 2000)\n} }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -370,9 +370,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH eligible AS (\n  SELECT t.id AS token_id, t.approver_id\n  FROM approval_tokens t\n  JOIN approvers a ON a.id = t.approver_id AND a.active\n  JOIN incidents i ON i.id = t.incident_id\n  WHERE t.incident_id::text = $1\n    AND t.token_hash = encode(sha256(convert_to($2,'UTF8')),'hex')\n    AND t.used_at IS NULL\n    AND t.expires_at > now()\n    AND i.status = 'awaiting_approval'\n    AND i.decided_by IS NULL\n    AND (a.permission_level = 'full' OR (a.permission_level = 'partial' AND i.severity = 'low'))\n  FOR UPDATE OF i, t\n), won AS (\n  UPDATE incidents i\n  SET decided_by = e.approver_id, decided_at = now(), token_used = true, updated_at = now(),\n      status = CASE WHEN $3 = 'approve' THEN i.status ELSE 'rejected' END\n  FROM eligible e\n  WHERE i.id::text = $1 AND i.decided_by IS NULL\n  RETURNING i.id, i.diagnosis_json, i.workflow_id, i.workflow_name, i.node_name, e.approver_id\n), burn AS (\n  UPDATE approval_tokens SET used_at = now()\n  WHERE incident_id::text = $1 AND used_at IS NULL AND EXISTS (SELECT 1 FROM won)\n  RETURNING id\n)\nSELECT w.*, (SELECT count(*) FROM burn) AS tokens_burned FROM won w;",
+        "query": "WITH eligible AS (\n  SELECT t.id AS token_id, t.approver_id\n  FROM approval_tokens t\n  JOIN approvers a ON a.id = t.approver_id AND a.active\n  JOIN incidents i ON i.id = t.incident_id\n  WHERE t.incident_id::text = $1\n    AND t.token_hash = encode(sha256(convert_to($2,'UTF8')),'hex')\n    AND t.used_at IS NULL\n    AND t.expires_at > now()\n    AND i.status = 'awaiting_approval'\n    AND i.decided_by IS NULL\n    AND i.diagnosis_hash = $4\n    AND i.diagnosis_hash = encode(sha256(convert_to(i.diagnosis_json, 'UTF8')), 'hex')\n    AND (a.permission_level = 'full' OR (a.permission_level = 'partial' AND i.severity = 'low'))\n  FOR UPDATE OF i, t\n), won AS (\n  UPDATE incidents i\n  SET decided_by = e.approver_id, decided_at = now(), token_used = true, updated_at = now(),\n      status = CASE WHEN $3 = 'approve' THEN i.status ELSE 'rejected' END\n  FROM eligible e\n  WHERE i.id::text = $1 AND i.decided_by IS NULL\n  RETURNING i.id, i.diagnosis_json, i.diagnosis_hash, i.source_commit, i.workflow_id, i.workflow_name, i.node_name, e.approver_id\n), burn AS (\n  UPDATE approval_tokens SET used_at = now()\n  WHERE incident_id::text = $1 AND used_at IS NULL AND EXISTS (SELECT 1 FROM won)\n  RETURNING id\n)\nSELECT w.*, (SELECT count(*) FROM burn) AS tokens_burned FROM won w;",
         "options": {
-          "queryReplacement": "={{ [$json.incident, $json.token, $json.kind === 'suggest' ? $json.text : $json.action] }}"
+          "queryReplacement": "={{ [$json.incident, $json.token, $json.action, $json.diagnosis_hash] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -766,9 +766,9 @@
     "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "versionId": "473413c7-e8ce-4292-ab15-69f146e47742",
-  "activeVersionId": "473413c7-e8ce-4292-ab15-69f146e47742",
-  "versionCounter": 96,
+  "versionId": "c69b35ee-ce55-47ac-a59e-22fee570ffda",
+  "activeVersionId": "c69b35ee-ce55-47ac-a59e-22fee570ffda",
+  "versionCounter": 98,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "tags": []

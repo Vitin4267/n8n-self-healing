@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-28T00:31:30.680Z",
+  "updatedAt": "2026-10-28T00:45:25.061Z",
   "createdAt": "2026-07-26T21:57:59.207Z",
   "id": "AZWei6MYYJDihsBi",
   "name": "W1",
@@ -618,7 +618,7 @@
     },
     {
       "parameters": {
-        "command": "=flock -w 300 /var/lock/heal.lock -c '\ncd /home/victor-ferrareto-dias/projects/n8n-self-healing && git checkout main && git pull --ff-only && \\\ncp .incident/incident-{{ $(\"Code in JavaScript1\").item.json.incident_id }}.json .incident/current.json && \\\nclaude -p \"$(cat prompts/diagnose.md)\" \\\n  --allowedTools \"Read,Grep,Glob\" \\\n  --output-format json --max-turns 25'\n"
+        "command": "=bash /home/victor-ferrareto-dias/projects/n8n-self-healing/services/heal-run.sh diagnose {{ $(\"Code in JavaScript1\").item.json.incident_id }}"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -632,7 +632,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const fallback = (why) => [{ json: {\n  root_cause: `Diagnosis failed: ${why}`,\n  evidence: [], proposed_fix: '', files_to_change: [],\n  risk: 'high', confidence: 'low', needs_human_context: true,\n  cost_usd: null, diagnosis_failed: true\n} }];\n\ntry {\n  const raw = String($json.stdout || '');\n  if (!raw.trim()) {\n    return fallback('empty output from diagnosis agent' + ($json.stderr ? ': ' + String($json.stderr).slice(0, 200) : ''));\n  }\n  const lines = raw.trim().split('\\n').reverse();\n  const jsonLine = lines.find(l => l.trim().startsWith('{'));\n  if (!jsonLine) return fallback('no JSON envelope in agent output');\n  const envelope = JSON.parse(jsonLine);\n\n  let resultText = String(envelope.result || '').trim();\n  const fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\n  if (fenceMatch) {\n    resultText = fenceMatch[1].trim();\n  }\n  const diagnosis = JSON.parse(resultText);\n\n  return [{\n    json: {\n      root_cause: diagnosis.root_cause,\n      evidence: diagnosis.evidence,\n      proposed_fix: diagnosis.proposed_fix,\n      files_to_change: diagnosis.files_to_change,\n      risk: diagnosis.risk,\n      confidence: diagnosis.confidence,\n      needs_human_context: diagnosis.needs_human_context,\n      cost_usd: envelope.total_cost_usd\n    }\n  }];\n} catch (e) {\n  return fallback(String(e.message).slice(0, 200));\n}\n"
+        "jsCode": "const raw = String($json.stdout || '');\nconst meta = (raw.match(/^META .*$/gm) || []).join(' ');\nconst get = (k) => (meta.match(new RegExp('\\\\b' + k + '=(\\\\S+)')) || [])[1] || null;\nconst source_commit = get('base');\nconst snap = get('snapshot');\nconst workflow_snapshot_hash = snap && snap !== 'none' ? snap : null;\nconst agentExit = get('exit');\n\nconst fallback = (why) => [{ json: {\n  root_cause: `Diagnosis failed: ${why}`,\n  evidence: [], proposed_fix: '', files_to_change: [],\n  risk: 'high', confidence: 'low', needs_human_context: true,\n  cost_usd: null, diagnosis_failed: true,\n  source_commit, workflow_snapshot_hash\n} }];\n\ntry {\n  if (!raw.trim()) {\n    return fallback('empty output from diagnosis agent' + ($json.stderr ? ': ' + String($json.stderr).slice(0, 200) : ''));\n  }\n  const lines = raw.trim().split('\\n').reverse();\n  const jsonLine = lines.find(l => l.trim().startsWith('{'));\n  if (!jsonLine) return fallback('no JSON envelope in agent output' + (agentExit && agentExit !== '0' ? ` (agent exit=${agentExit})` : ''));\n  const envelope = JSON.parse(jsonLine);\n\n  let resultText = String(envelope.result || '').trim();\n  const fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\n  if (fenceMatch) {\n    resultText = fenceMatch[1].trim();\n  }\n  const diagnosis = JSON.parse(resultText);\n\n  return [{\n    json: {\n      root_cause: diagnosis.root_cause,\n      evidence: diagnosis.evidence,\n      proposed_fix: diagnosis.proposed_fix,\n      files_to_change: diagnosis.files_to_change,\n      risk: diagnosis.risk,\n      confidence: diagnosis.confidence,\n      needs_human_context: diagnosis.needs_human_context,\n      cost_usd: envelope.total_cost_usd,\n      source_commit,\n      workflow_snapshot_hash\n    }\n  }];\n} catch (e) {\n  return fallback(String(e.message).slice(0, 200));\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -646,9 +646,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE incidents\nSET diagnosis_json = $1,\n    status = 'awaiting_approval',\n    severity = $2,\n    expires_at = now() + interval '48 hours'\nWHERE id = $3;\n",
+        "query": "UPDATE incidents\nSET diagnosis_json = $1,\n    diagnosis_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex'),\n    diagnosis_version = diagnosis_version + 1,\n    source_commit = $4,\n    workflow_snapshot_hash = $5,\n    status = 'awaiting_approval',\n    severity = $2,\n    expires_at = now() + interval '48 hours'\nWHERE id = $3;",
         "options": {
-          "queryReplacement": "={{ [JSON.stringify($json), $('Normalize Triage').item.json.output.severity, $('Prepare AI Input').item.json.incident_id] }}"
+          "queryReplacement": "={{ [JSON.stringify($json), $('Normalize Triage').item.json.output.severity, $('Prepare AI Input').item.json.incident_id, $json.source_commit || null, $json.workflow_snapshot_hash || null] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -1278,9 +1278,9 @@
     "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "versionId": "5ce82f62-0104-4b8b-8e31-b6a5b6050e56",
-  "activeVersionId": "5ce82f62-0104-4b8b-8e31-b6a5b6050e56",
-  "versionCounter": 393,
+  "versionId": "6df52deb-95b6-4d2c-ad55-8a775817b920",
+  "activeVersionId": "6df52deb-95b6-4d2c-ad55-8a775817b920",
+  "versionCounter": 394,
   "triggerCount": 0,
   "sourceWorkflowId": null,
   "tags": []

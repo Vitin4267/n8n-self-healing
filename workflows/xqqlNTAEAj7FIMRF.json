@@ -1,6 +1,9 @@
 {
+  "updatedAt": "2026-10-28T00:45:25.033Z",
+  "createdAt": "2026-07-26T20:02:35.941Z",
   "id": "xqqlNTAEAj7FIMRF",
   "name": "Sub - Export Workflows",
+  "description": null,
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -118,7 +121,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "=/home/user/projects/n8n-self-healing/workflows/{{ $('Split Out').item.json.id }}.json",
+        "fileName": "=/home/victor-ferrareto-dias/projects/n8n-self-healing/workflows/{{ $('Split Out').item.json.id }}.json",
         "options": {}
       },
       "type": "n8n-nodes-base.readWriteFile",
@@ -147,7 +150,7 @@
     },
     {
       "parameters": {
-        "command": "cd /home/user/projects/n8n-self-healing && git add -A && git diff --cached --quiet || (git commit -m \"chore: sync workflows\" && git push)\n"
+        "command": "flock -w 120 /var/lock/heal-git.lock sh -c 'cd /home/victor-ferrareto-dias/projects/n8n-self-healing && git checkout main && git add -A && (git diff --cached --quiet || (git commit -q -m \"chore: sync workflows\" && git pull --rebase -q && git push -q))'\n"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -176,7 +179,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "=/home/user/projects/n8n-self-healing/workflows/{{ $('When Executed by Another Workflow').item.json.workflow_id }}.json",
+        "fileName": "=/home/victor-ferrareto-dias/projects/n8n-self-healing/workflows/{{ $('When Executed by Another Workflow').item.json.workflow_id }}.json",
         "options": {}
       },
       "type": "n8n-nodes-base.readWriteFile",
@@ -232,6 +235,34 @@
       ],
       "id": "ad91a54d-21b8-4db3-9cf2-7c1772fd898c",
       "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remove dados de runtime/clientes antes de exportar para o repo (público)\nconst item = $input.item.json;\ndelete item.staticData;\ndelete item.pinData;\nreturn { json: item };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        -288
+      ],
+      "id": "strip-runtime-1",
+      "name": "Strip Runtime Data",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remove dados de runtime/clientes antes de exportar para o repo (público)\nconst item = $input.item.json;\ndelete item.staticData;\ndelete item.pinData;\nreturn { json: item };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        256
+      ],
+      "id": "strip-runtime-2",
+      "name": "Strip Runtime Data1",
+      "alwaysOutputData": false
     }
   ],
   "connections": {
@@ -279,7 +310,7 @@
       "main": [
         [
           {
-            "node": "Convert to File",
+            "node": "Strip Runtime Data",
             "type": "main",
             "index": 0
           }
@@ -312,7 +343,7 @@
       "main": [
         [
           {
-            "node": "Convert to File1",
+            "node": "Strip Runtime Data1",
             "type": "main",
             "index": 0
           }
@@ -340,6 +371,28 @@
           }
         ]
       ]
+    },
+    "Strip Runtime Data": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip Runtime Data1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -347,7 +400,12 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "ff6efa6a-26fe-45b1-9ee1-08c056e5aa55",
-  "createdAt": "2026-07-26 20:02:35.941",
-  "updatedAt": "2026-07-26 21:36:40.408"
+  "meta": null,
+  "nodeGroups": [],
+  "versionId": "6233fca4-e47e-4f06-a615-2672fa75559c",
+  "activeVersionId": "6233fca4-e47e-4f06-a615-2672fa75559c",
+  "versionCounter": 59,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": []
 }
