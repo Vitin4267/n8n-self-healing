@@ -44,11 +44,15 @@ repetir o evento devolve o mesmo recibo; sem chave o serviço **não sobe e não
   (dir 0700, chave 0600), env e token 0600 fora do repo. **Limite honesto:** é o *mesmo usuário Unix*
   que roda o n8n e o Claude Code, então quem executa o pipeline consegue ler a chave. Protege contra
   vazamento acidental e contra o repo, **não** contra um n8n comprometido.
-- **Pronto mas NÃO testado (`deploy/install-hardened-root.sh` + unit)**: usuário de sistema
-  `boundaryattest`, código read-only em `/opt`, chave só legível por ele, unit com sandbox. Exige
-  `sudo`, que não estava disponível na automação que escreveu isto. Rodar uma vez, na mão.
-- **Nenhum daemon foi instalado.** O serviço roda em primeiro plano (`deploy/run.sh`).
-  `loginctl enable-linger`/unit de usuário foram deliberadamente deixados para o dono decidir.
+- **Modo endurecido instalado e verificado (`deploy/install-hardened-root.sh`)**: usuário de sistema
+  `boundaryattest`, código read-only em `/opt`, chave/token/env só legíveis por ele, unit com sandbox
+  (`active`, `enabled`). Verificado como o usuário que roda n8n/Claude: **"Permissão negada"** ao ler
+  a chave privada, o token e o env, e ao listar o diretório de chaves. Identidade atual:
+  `sha256:5c2e09a1e2850c9ca6213362` (a chave anterior, de usuário comum, `sha256:f311d82d5894d51f852f7a1a`,
+  continua em `trusted-keys.json` só para verificar o que ela já assinou; seu arquivo deve ser apagado).
+  Dois bugs do instalador apareceram só na execução real (o primeiro: `tsc` ausente com `--omit=dev`).
+- O serviço agora é um unit de sistema (instalado pelo dono com `sudo`). `deploy/run.sh` e
+  `loginctl enable-linger` deixam de ser necessários.
 
 ## Não coberto / próximos passos
 
