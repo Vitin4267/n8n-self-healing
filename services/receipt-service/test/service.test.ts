@@ -6,6 +6,7 @@ import type pg from "pg";
 import { evidenceHash } from "../src/evidence.js";
 import { KEY_FILES, KeyError, loadSigningKey } from "../src/keys.js";
 import { emitReceipt, readBundle, ServiceError, type Deps } from "../src/service.js";
+import { auditIncident } from "../src/audit.js";
 import { verifyBundle, type Bundle } from "../src/verify.js";
 import { DIAG, ENV, H, insertEvent, newKey, sample, setupDb, TEST_DB } from "./helpers.js";
 
@@ -152,4 +153,20 @@ test("the ledger is append-only: events and receipts cannot be updated, deleted 
   assert.equal(await blocked(`DELETE FROM incident_receipts WHERE event_id = '${e.event_id}'`), true, "delete receipt");
   assert.equal(await blocked("TRUNCATE incident_receipts"), true, "truncate receipts");
   assert.equal(await blocked("TRUNCATE incident_events CASCADE"), true, "truncate events");
+});
+
+test("audit: verifies a whole incident from the DB, reports pending events, and catches a bad receipt", { skip }, async () => {
+  const i = nextInc();
+  const trusted = { [d.key.keyId]: d.key.publicKeyPem };
+  await emitReceipt(d, (await insertEvent(pool, sample("triage", i))).event_id);
+  const dEv = await insertEvent(pool, sample("diagnosis", i));            // recorded, receipt NOT yet emitted
+  let rep = await auditIncident(pool, i, trusted, ENV);
+  assert.deepEqual([rep.verified, rep.pending, rep.failed, rep.ok], [1, 1, 0, true], "pending is reported, not hidden");
+  await emitReceipt(d, dEv.event_id);                                      // the reconciler's job
+  rep = await auditIncident(pool, i, trusted, ENV);
+  assert.deepEqual([rep.verified, rep.pending, rep.failed], [2, 0, 0]);
+  rep = await auditIncident(pool, i, { "sha256:other": "x" }, ENV);        // wrong trust list
+  assert.equal(rep.ok, false); assert.equal(rep.failed, 2);
+  rep = await auditIncident(pool, i, trusted, "production");               // wrong environment
+  assert.equal(rep.ok, false);
 });

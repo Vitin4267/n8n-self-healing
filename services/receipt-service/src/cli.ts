@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { generateKey, loadSigningKey, KeyError } from "./keys.js";
 import { createReceiptServer } from "./server.js";
 import { makePool } from "./store.js";
+import { auditIncident } from "./audit.js";
 import { verifyBundle, type Bundle } from "./verify.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -45,8 +46,19 @@ async function main() {
       console.log(JSON.stringify(res, null, 2));
       process.exit(res.ok ? 0 : 1);
     }
+    case "audit": {
+      // audit <incidentId> --db <postgres url> --trusted <keys.json> [--env production]
+      const id = Number(rest[0]);
+      if (!Number.isInteger(id) || id <= 0) { console.error("usage: audit <incidentId> --db <url> --trusted <keys.json> [--env production]"); process.exit(2); }
+      const pool = makePool(need("db", "RECEIPT_DB_URL"));
+      const report = await auditIncident(pool, id, JSON.parse(readFileSync(need("trusted"), "utf8")), flag("env") ?? "production");
+      await pool.end();
+      for (const i of report.items) console.log(`${i.status.padEnd(8)} ${i.stage.padEnd(9)} attempt=${i.attempt} ${i.status === "failed" ? "-> " + (i.problems ?? []).join("; ") : ""}`);
+      console.log(`incident ${id}: verified=${report.verified} pending=${report.pending} failed=${report.failed}`);
+      process.exit(report.ok ? 0 : 1);
+    }
     default:
-      console.error("usage: cli.js <keygen|preflight|serve|verify> ...");
+      console.error("usage: cli.js <keygen|preflight|serve|verify|audit> ...");
       process.exit(2);
   }
 }
