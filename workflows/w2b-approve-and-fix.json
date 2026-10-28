@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-27T23:22:41.404Z",
+  "updatedAt": "2026-10-28T00:31:30.712Z",
   "createdAt": "2026-07-27T15:36:21.151Z",
   "id": "YuyxIat8NB2F4TxG",
   "name": "W2b - Approve & Fix",
@@ -163,11 +163,12 @@
         -240
       ],
       "id": "c8c20c49-ea29-4c59-9f00-aa1e49ed00c2",
-      "name": "Execute Command"
+      "name": "Execute Command",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.stdout;\nconst lines = raw.trim().split('\\n').reverse();\nconst jsonLine = lines.find(l => l.trim().startsWith('{'));\nconst envelope = JSON.parse(jsonLine);\n\nlet resultText = envelope.result.trim();\nconst fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\nif (fenceMatch) {\n  resultText = fenceMatch[1].trim();\n}\n\nlet fixResult;\ntry {\n  fixResult = JSON.parse(resultText);\n} catch (e) {\n  // Claude didn't return clean JSON (e.g. a tool call got blocked and it\n  // explained in prose instead) — don't let this die silently. Surface the\n  // raw explanation so the human still gets notified with something\n  // actionable, instead of the whole execution erroring out with no message.\n  fixResult = {\n    status: 'needs_manual_review',\n    branch: null,\n    pr_url: null,\n    commit: null,\n    abort_reason: resultText\n  };\n}\n\nreturn [{\n  json: {\n    status: fixResult.status,\n    branch: fixResult.branch,\n    pr_url: fixResult.pr_url,\n    commit: fixResult.commit,\n    abort_reason: fixResult.abort_reason,\n    cost_usd: envelope.total_cost_usd\n  }\n}];\n"
+        "jsCode": "const failed = (why) => [{ json: {\n  status: 'needs_manual_review', branch: null, pr_url: null, commit: null,\n  abort_reason: why, cost_usd: null\n} }];\n\ntry {\n  const raw = String($json.stdout || '');\n  if (!raw.trim()) {\n    return failed('Fix agent produced no output' + ($json.stderr ? ': ' + String($json.stderr).slice(0, 200) : ''));\n  }\n  const lines = raw.trim().split('\\n').reverse();\n  const jsonLine = lines.find(l => l.trim().startsWith('{'));\n  if (!jsonLine) return failed('No JSON envelope in fix agent output');\n  const envelope = JSON.parse(jsonLine);\n\n  let resultText = String(envelope.result || '').trim();\n  const fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\n  if (fenceMatch) {\n    resultText = fenceMatch[1].trim();\n  }\n\n  let fixResult;\n  try {\n    fixResult = JSON.parse(resultText);\n  } catch (e) {\n    // Claude didn't return clean JSON (e.g. a tool call got blocked and it\n    // explained in prose instead) — surface the raw explanation so the human\n    // still gets notified with something actionable.\n    fixResult = { status: 'needs_manual_review', branch: null, pr_url: null, commit: null, abort_reason: resultText };\n  }\n\n  return [{\n    json: {\n      status: fixResult.status,\n      branch: fixResult.branch,\n      pr_url: fixResult.pr_url,\n      commit: fixResult.commit,\n      abort_reason: fixResult.abort_reason,\n      cost_usd: envelope.total_cost_usd\n    }\n  }];\n} catch (e) {\n  return failed('Could not parse fix agent output: ' + String(e.message).slice(0, 200));\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -765,9 +766,9 @@
     "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "versionId": "26bbd2e3-2b1c-4a24-a6e3-0c414a8aa9f7",
-  "activeVersionId": "26bbd2e3-2b1c-4a24-a6e3-0c414a8aa9f7",
-  "versionCounter": 95,
+  "versionId": "473413c7-e8ce-4292-ab15-69f146e47742",
+  "activeVersionId": "473413c7-e8ce-4292-ab15-69f146e47742",
+  "versionCounter": 96,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "tags": []

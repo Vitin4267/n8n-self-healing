@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-27T23:22:41.438Z",
+  "updatedAt": "2026-10-28T00:31:30.680Z",
   "createdAt": "2026-07-26T21:57:59.207Z",
   "id": "AZWei6MYYJDihsBi",
   "name": "W1",
@@ -627,11 +627,12 @@
         -320
       ],
       "id": "22335d4a-808c-4be2-90e4-d2331bef8b97",
-      "name": "Execute Command"
+      "name": "Execute Command",
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.stdout;\nconst lines = raw.trim().split('\\n').reverse();\nconst jsonLine = lines.find(l => l.trim().startsWith('{'));\nconst envelope = JSON.parse(jsonLine);\n\nlet resultText = envelope.result.trim();\nconst fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\nif (fenceMatch) {\n  resultText = fenceMatch[1].trim();\n}\nconst diagnosis = JSON.parse(resultText);\n\nreturn [{\n  json: {\n    root_cause: diagnosis.root_cause,\n    evidence: diagnosis.evidence,\n    proposed_fix: diagnosis.proposed_fix,\n    files_to_change: diagnosis.files_to_change,\n    risk: diagnosis.risk,\n    confidence: diagnosis.confidence,\n    needs_human_context: diagnosis.needs_human_context,\n    cost_usd: envelope.total_cost_usd\n  }\n}];\n"
+        "jsCode": "const fallback = (why) => [{ json: {\n  root_cause: `Diagnosis failed: ${why}`,\n  evidence: [], proposed_fix: '', files_to_change: [],\n  risk: 'high', confidence: 'low', needs_human_context: true,\n  cost_usd: null, diagnosis_failed: true\n} }];\n\ntry {\n  const raw = String($json.stdout || '');\n  if (!raw.trim()) {\n    return fallback('empty output from diagnosis agent' + ($json.stderr ? ': ' + String($json.stderr).slice(0, 200) : ''));\n  }\n  const lines = raw.trim().split('\\n').reverse();\n  const jsonLine = lines.find(l => l.trim().startsWith('{'));\n  if (!jsonLine) return fallback('no JSON envelope in agent output');\n  const envelope = JSON.parse(jsonLine);\n\n  let resultText = String(envelope.result || '').trim();\n  const fenceMatch = resultText.match(/```json\\s*([\\s\\S]*?)```/i);\n  if (fenceMatch) {\n    resultText = fenceMatch[1].trim();\n  }\n  const diagnosis = JSON.parse(resultText);\n\n  return [{\n    json: {\n      root_cause: diagnosis.root_cause,\n      evidence: diagnosis.evidence,\n      proposed_fix: diagnosis.proposed_fix,\n      files_to_change: diagnosis.files_to_change,\n      risk: diagnosis.risk,\n      confidence: diagnosis.confidence,\n      needs_human_context: diagnosis.needs_human_context,\n      cost_usd: envelope.total_cost_usd\n    }\n  }];\n} catch (e) {\n  return fallback(String(e.message).slice(0, 200));\n}\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -670,7 +671,7 @@
         "resource": "messages-api",
         "instanceName": "testeN8N",
         "remoteJid": "={{ $json.phone }}",
-        "messageText": "=🔍 *Incident Diagnosis*\n\n*Root cause:* {{ $('Parse Diagnosis').first().json.root_cause }}\n\n*Proposed fix:* {{ $('Parse Diagnosis').first().json.proposed_fix || \"None (not a real failure)\" }}\n\n*Risk:* {{ $('Parse Diagnosis').first().json.risk }} | *Confidence:* {{ $('Parse Diagnosis').first().json.confidence }}\n\n{{ $json.capability === 'approve' ? '👉 Review & approve:' : '👉 Review & suggest:' }} http://localhost:5678/webhook/heal-review?incident={{ $('Prepare AI Input').first().json.incident_id }}&token={{ $json.token }}\n",
+        "messageText": "=🔍 *Incident Diagnosis*\n\n*Root cause:* {{ $('Parse Diagnosis').first().json.root_cause }}\n\n*Proposed fix:* {{ $('Parse Diagnosis').first().json.diagnosis_failed ? \"⚠️ Automatic diagnosis FAILED — needs human investigation\" : ($('Parse Diagnosis').first().json.proposed_fix || \"None (not a real failure)\") }}\n\n*Risk:* {{ $('Parse Diagnosis').first().json.risk }} | *Confidence:* {{ $('Parse Diagnosis').first().json.confidence }}\n\n{{ $json.capability === 'approve' ? '👉 Review & approve:' : '👉 Review & suggest:' }} http://localhost:5678/webhook/heal-review?incident={{ $('Prepare AI Input').first().json.incident_id }}&token={{ $json.token }}\n",
         "options_message": {}
       },
       "type": "n8n-nodes-evolution-api.evolutionApi",
@@ -1277,9 +1278,9 @@
     "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "versionId": "477990d4-8132-41ed-9968-7226e4852eea",
-  "activeVersionId": "477990d4-8132-41ed-9968-7226e4852eea",
-  "versionCounter": 392,
+  "versionId": "5ce82f62-0104-4b8b-8e31-b6a5b6050e56",
+  "activeVersionId": "5ce82f62-0104-4b8b-8e31-b6a5b6050e56",
+  "versionCounter": 393,
   "triggerCount": 0,
   "sourceWorkflowId": null,
   "tags": []

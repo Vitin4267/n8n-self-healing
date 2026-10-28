@@ -2,7 +2,7 @@
 
 A self-hosted n8n automation that turns a production workflow failure into a
 full incident-response cycle: detection → AI triage → autonomous diagnosis →
-human approval → autonomous fix → pull request. Built on n8n, Claude Code
+human approval (multiple approvers with permission levels) → autonomous fix → pull request. Built on n8n, Claude Code
 (headless, on the same host), Postgres, and WhatsApp for notifications/approval.
 
 ## How it works
@@ -109,8 +109,13 @@ CLAUDE.md            repo-level context and hard rules for the agent
 - Branch protection on `main` requires GitHub Pro for a private repo — not
   enabled here; the safety net today is the tool allowlist plus the two
   approval gates, not GitHub's native protection.
-- The flood/rate-limit path currently only logs — no WhatsApp alert fires
-  when a fingerprint gets suppressed (easy to add, deliberately left out for now).
+- The rate-limit/flood path is effectively shadowed by dedup: `Check Dedup` also
+  matches any incident created in the last 60 minutes, so a repeat of the same
+  fingerprint never reaches the 10-minute rate limit (except in a race between two
+  simultaneous first occurrences). A real flood alert would have to hook into the
+  dedup branch (`occurrences` spiking) instead.
+- Approval links are bearer capabilities: there is no per-user login/CSRF yet, so a
+  forwarded link is a transferred capability (see `docs/decisions/fase1-multi-aprovadores-status.md`).
 - A `W-Fallback` error workflow and a daily digest exist to catch failures in
   the healing pipeline itself and to summarize low-severity, never-escalated
   incidents — but they reuse simpler pre-existing infrastructure rather than
