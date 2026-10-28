@@ -16,6 +16,8 @@ Repo structure:
 ## Phase 2 — Fix (write, on a branch)
 
 - Apply exactly the fix approved in Phase 1. One atomic commit. Open a PR.
+- Touch only `diagnosis.files_to_change`; the runner (`services/heal-run.sh`) reports any other file as a scope violation.
+- Each incident runs in its own git worktree (`.worktrees/`); never rely on, or modify, state from another incident.
 - If, while applying it, you discover the diagnosis was wrong: abort and report — never improvise a different fix.
 
 ## Explicit prohibitions

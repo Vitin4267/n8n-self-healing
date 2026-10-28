@@ -6,3 +6,6 @@ node_modules/
 # workflows de outros projetos exportados pelo W0 — nunca versionar (contêm dados de clientes)
 workflows/qfPih1jqBdVqoZ3v.json
 workflows/kzpmd7KDJ66tRlR5.json
+
+# worktrees isolados por incidente (services/heal-run.sh)
+.worktrees/
