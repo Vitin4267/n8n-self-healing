@@ -59,11 +59,12 @@ Um recibo, sozinho, nunca libera a Fase 2 do Claude.
 - [x] `Build/Record/Request` de **triage** no W1 (ramo acima do fluxo principal, `onError: continue`)
 - [x] `Record/Request` de **diagnosis** no W1 (evento amarrado à `diagnosis_version`)
 - [x] Reconciliador `W-Receipts-Reconcile` (a cada 5 min emite recibos pendentes; idempotente)
-- [~] Investigar: incidente 94 terminou com **1 evento** (esperado 2)
-- [ ] Teste: serviço/credencial fora → pipeline continua, eventos gravados, recibos pendentes
+- [x] Bug achado no teste: o n8n bloqueia a palavra `caller` em expressões → o evento de triagem não era gravado (campo renomeado para `actor`); agora os **2 eventos** são gravados (incidente 95)
+- [x] Teste: serviço/credencial fora → pipeline continua até `awaiting_approval`, eventos gravados, recibos **pendentes** (incidentes 94 e 95; `audit` mostra `pending`, não esconde)
 - [ ] Teste: recuperação → reconciliador emite, **sem repetir** triagem/diagnóstico
 - [ ] Teste: `audit` do incidente verifica tudo com as chaves do repo
-- [ ] Atualizar `trusted-keys.json`/doc e publicar
+- [x] Workflows exportados (sanitizados) para o repo
+- [ ] Atualizar doc da Fase 4 e publicar
 
 ## Fase 5 — aprovação + bloqueio antes da execução  `[ ]`
 - [ ] Gravar o evento `approval` **na mesma transação** que consome o token (nível, severidade, capability, token_ref, hash do diagnóstico)

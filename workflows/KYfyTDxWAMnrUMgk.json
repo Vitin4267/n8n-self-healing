@@ -1,0 +1,127 @@
+{
+  "updatedAt": "2026-10-28T02:01:04.037Z",
+  "createdAt": "2026-10-28T02:01:04.037Z",
+  "id": "KYfyTDxWAMnrUMgk",
+  "name": "W-Receipts-Reconcile",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "96adce8c-0f5f-4637-851f-98a243838416",
+      "name": "Every 5 minutes"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT e.event_id\nFROM incident_events e\nLEFT JOIN incident_receipts r ON r.event_id = e.event_id\nWHERE r.event_id IS NULL\n  AND e.created_at < now() - interval '2 minutes'\n  AND e.created_at > now() - interval '7 days'\nORDER BY e.created_at\nLIMIT 25;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        0
+      ],
+      "id": "c64aee6e-7cb1-499e-a5b0-739282fb64e7",
+      "name": "Find Pending Events",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      },
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/v1/receipts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ eventId: $json.event_id }) }}",
+        "options": {
+          "timeout": 5000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "18fa1e3e-9074-4b0c-a023-d14ac1e7e6fd",
+      "name": "Emit Pending Receipt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "I9nZGqHcQhobOBJ7",
+          "name": "Header Auth account 3"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Find Pending Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Pending Events": {
+      "main": [
+        [
+          {
+            "node": "Emit Pending Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "NyMhXxnkyTbhmVQj"
+  },
+  "meta": null,
+  "nodeGroups": [],
+  "versionId": "04f784c7-c01b-4748-9e4f-06f98e61b691",
+  "activeVersionId": "04f784c7-c01b-4748-9e4f-06f98e61b691",
+  "versionCounter": 1,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": []
+}

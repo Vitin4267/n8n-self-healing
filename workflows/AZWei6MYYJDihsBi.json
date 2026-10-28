@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-28T00:45:25.061Z",
+  "updatedAt": "2026-10-28T02:03:22.325Z",
   "createdAt": "2026-07-26T21:57:59.207Z",
   "id": "AZWei6MYYJDihsBi",
   "name": "W1",
@@ -952,6 +952,134 @@
       ],
       "id": "5a36a34f-0722-463c-9326-b236990cbc6b",
       "name": "Normalize Triage"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evidence the receipt will vouch for. No raw error text: only the fingerprint (hash) identifies it.\nconst o = $('Normalize Triage').first().json.output;\nconst e = $('Edit Fields1').first().json;\nreturn [{ json: {\n  incident_id: $('Prepare AI Input').first().json.incident_id,\n  input: { fingerprint: e.fingerprint, workflow_id: e.workflow_id, node_name: e.node_name, recent_count: Number($('Prepare AI Input').first().json.recent_count || 0), model: 'openrouter:gpt-4o-mini', prompt_version: 'v1' },\n  output: { severity: o.severity, escalate: o.escalate, reason: o.reason || '', source: o.source === 'fallback' ? 'fallback' : 'model' },\n  tool_metadata: { classifier: 'n8n AI Agent + Structured Output Parser' },\n  actor: { id: 'n8n:AZWei6MYYJDihsBi', type: 'service', authRef: 'n8n-workflow' }\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2392,
+        -760
+      ],
+      "id": "af875ed9-a3a2-49ec-8ed7-9147a2575480",
+      "name": "Build Triage Event",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO incident_events (incident_id, stage, attempt, action_status, input_evidence, output_evidence, tool_metadata, caller)\nVALUES ($1::int, 'triage', 1, 'executed', $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb)\nON CONFLICT (incident_id, stage, attempt) DO NOTHING\nRETURNING event_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.incident_id, JSON.stringify($json.input), JSON.stringify($json.output), JSON.stringify($json.tool_metadata), JSON.stringify($json.actor)] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2592,
+        -760
+      ],
+      "id": "66a31694-204b-4337-9a0e-c88f0764bc6c",
+      "name": "Record Triage Event",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      },
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/v1/receipts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ eventId: $json.event_id }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2792,
+        -760
+      ],
+      "id": "a856493b-2d94-4d8b-9467-7520b7bc949a",
+      "name": "Request Triage Receipt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "I9nZGqHcQhobOBJ7",
+          "name": "Header Auth account 3"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO incident_events (incident_id, stage, attempt, action_status, input_evidence, output_evidence, tool_metadata, caller)\n  SELECT i.id, 'diagnosis', i.diagnosis_version, 'executed',\n         jsonb_build_object('workflow_id', i.workflow_id, 'node_name', i.node_name, 'source_commit', i.source_commit,\n                            'workflow_snapshot_hash', i.workflow_snapshot_hash, 'prompt_version', $2::text, 'allowlist', 'Read,Grep,Glob'),\n         jsonb_build_object('diagnosis_hash', i.diagnosis_hash, 'diagnosis_version', i.diagnosis_version, 'diagnosis', i.diagnosis_json::jsonb),\n         jsonb_build_object('agent', 'claude-code'),\n         jsonb_build_object('id', 'n8n:AZWei6MYYJDihsBi', 'type', 'service', 'authRef', 'n8n-workflow')\n  FROM incidents i\n  WHERE i.id = $1::int AND i.diagnosis_hash IS NOT NULL\n  ON CONFLICT (incident_id, stage, attempt) DO NOTHING\n  RETURNING event_id\n)\nSELECT event_id FROM ins\nUNION ALL\nSELECT e.event_id FROM incident_events e JOIN incidents i ON i.id = e.incident_id\n WHERE e.incident_id = $1::int AND e.stage = 'diagnosis' AND e.attempt = i.diagnosis_version AND NOT EXISTS (SELECT 1 FROM ins)\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [$('Prepare AI Input').first().json.incident_id, 'v1'] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4320,
+        -780
+      ],
+      "id": "cefda00a-13e2-445d-b7cd-7efe5e8042af",
+      "name": "Record Diagnosis Event",
+      "credentials": {
+        "postgres": {
+          "id": "52EskqeODOD50WcM",
+          "name": "Postgres account 2"
+        }
+      },
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8787/v1/receipts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ eventId: $json.event_id }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4520,
+        -780
+      ],
+      "id": "b75ac4b5-8963-429a-be7c-f1289c801336",
+      "name": "Request Diagnosis Receipt",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "I9nZGqHcQhobOBJ7",
+          "name": "Header Auth account 3"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -1182,6 +1310,11 @@
       "main": [
         [
           {
+            "node": "Record Diagnosis Event",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Get Active Approvers",
             "type": "main",
             "index": 0
@@ -1258,7 +1391,45 @@
       "main": [
         [
           {
+            "node": "Build Triage Event",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Triage Event": {
+      "main": [
+        [
+          {
+            "node": "Record Triage Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Triage Event": {
+      "main": [
+        [
+          {
+            "node": "Request Triage Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Diagnosis Event": {
+      "main": [
+        [
+          {
+            "node": "Request Diagnosis Receipt",
             "type": "main",
             "index": 0
           }
@@ -1278,9 +1449,9 @@
     "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
-  "versionId": "6df52deb-95b6-4d2c-ad55-8a775817b920",
-  "activeVersionId": "6df52deb-95b6-4d2c-ad55-8a775817b920",
-  "versionCounter": 394,
+  "versionId": "c677e852-0247-4ff6-b96a-51874ba7f55e",
+  "activeVersionId": "c677e852-0247-4ff6-b96a-51874ba7f55e",
+  "versionCounter": 396,
   "triggerCount": 0,
   "sourceWorkflowId": null,
   "tags": []
