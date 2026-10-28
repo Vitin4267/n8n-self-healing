@@ -90,11 +90,16 @@ more than pretending it wasn't involved.
 - **OpenRouter (GPT-4o-mini)** — severity classification with structured output
 - **Evolution API** — WhatsApp notifications and the review link
 - **GitHub** — source of truth for workflow JSON, PR review/merge as the final gate
+- **BoundaryAttest** (vendored, pinned) — signed `server_attested` receipts for incident boundaries; see
+  `services/receipt-service/` and `docs/decisions/fase3-servico-de-recibos.md`
 
 ## Repo structure
 
 ```
 workflows/           n8n workflows exported as JSON (source of truth)
+services/
+  heal-run.sh        per-incident git-worktree runner for Claude Code (diagnose / fix)
+  receipt-service/   signs BoundaryAttest receipts for persisted incident events (+ verifier)
 prompts/
   diagnose.md        Phase 1 system prompt (read-only investigation)
   fix.md             Phase 2 system prompt (apply approved fix, open PR)

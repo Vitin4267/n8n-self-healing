@@ -1,0 +1,14 @@
+{
+  "name": "n8n-self-healing-receipt-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Signs server_attested BoundaryAttest receipts for persisted incident events.",
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "start": "node dist/src/cli.js serve"
+  },
+  "dependencies": { "pg": "^8.16.0" },
+  "devDependencies": { "@types/node": "^22.10.0", "@types/pg": "^8.15.0", "typescript": "~5.9.0" }
+}

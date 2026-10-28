@@ -1,0 +1,35 @@
+[Unit]
+Description=n8n self-healing receipt service (BoundaryAttest server_attested)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=boundaryattest
+Group=boundaryattest
+EnvironmentFile=/etc/n8n-self-healing-attest/env
+WorkingDirectory=/opt/n8n-self-healing-receipts
+ExecStart=/opt/n8n-self-healing-receipts/bin/node /opt/n8n-self-healing-receipts/dist/src/cli.js serve
+Restart=on-failure
+RestartSec=3
+
+# the service only needs loopback TCP (HTTP in, Postgres out) and its own key directory
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/n8n-self-healing-attest
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
