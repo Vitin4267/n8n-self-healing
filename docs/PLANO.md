@@ -2,6 +2,8 @@
 
 Legenda: `[x]` feito e verificado · `[~]` em andamento · `[ ]` a fazer · `[!]` bloqueado/decisão do dono
 
+Visão geral e como retomar: [RESUMO-COMPLETO](RESUMO-COMPLETO.md).
+
 Detalhe técnico de cada fase: [plano completo](decisions/plano-multi-aprovadores-boundaryattest-chatgpt.md) ·
 [Fase 1](decisions/fase1-multi-aprovadores-status.md) · [Fase 2](decisions/fase2-isolamento-e-versao-do-diagnostico.md) ·
 [Fase 3](decisions/fase3-servico-de-recibos.md).
