@@ -23,7 +23,7 @@ export HEAL_GIT_LOCK="$TMP/heal-git.lock"
 cat > "$TMP/claude" <<'EOF'
 #!/usr/bin/env bash
 sleep 2
-INC="$(python3 -c 'import json;print(json.load(open(".incident/current.json"))["incident_id"])')"
+INC="$(python3 -c 'import json; d=json.load(open(".incident/current.json")); d=d[0] if isinstance(d,list) else d; print(d["incident_id"])')"
 if [ "$(cat prompts/fix.md 2>/dev/null)" = "$(printf 'fix')" ] && [ "$1" = "-p" ] && [[ "$2" == fix* ]]; then
   echo '{"patched":true}' > workflows/WFA.json; echo oops > OUT_OF_SCOPE.txt
   git add -A; git -c user.email=t@t -c user.name=t commit -q -m "fix $INC"
@@ -36,8 +36,8 @@ mk() { # id wf
   python3 - "$1" "$2" <<'PY'
 import json,sys
 i,wf=sys.argv[1:3]
-json.dump({"incident_id":int(i),"workflow_file":f"workflows/{wf}.json",
-           "diagnosis":{"files_to_change":[f"workflows/{wf}.json"]}}, open(f".incident/incident-{i}.json","w"))
+d={"incident_id":int(i),"workflow_file":f"workflows/{wf}.json","diagnosis":{"files_to_change":[f"workflows/{wf}.json"]}}
+json.dump([d] if i=="9002" else d, open(f".incident/incident-{i}.json","w"))   # 9002 = formato real do n8n (array)
 PY
 }
 mk 9001 WFA; mk 9002 WFB
@@ -51,7 +51,7 @@ ELAPSED=$(( $(date +%s) - START ))
 grep -q "saw incident 9001" "$TMP/o1" && ! grep -q "9002" "$TMP/o1"; ok $? "9001 viu só o próprio contexto"
 grep -q "saw incident 9002" "$TMP/o2" && ! grep -q "9001" "$TMP/o2"; ok $? "9002 viu só o próprio contexto"
 S1=$(grep -o 'snapshot=[0-9a-f]*' "$TMP/o1"); S2=$(grep -o 'snapshot=[0-9a-f]*' "$TMP/o2")
-[ -n "$S1" ] && [ "$S1" != "$S2" ]; ok $? "snapshot hash difere por workflow ($S1 vs $S2)"
+[ -n "$S1" ] && [ "$S1" != "$S2" ] && ! echo "$S1$S2" | grep -q none; ok $? "snapshot hash real e distinto, nos dois formatos de arquivo (objeto e array)"
 [ "$ELAPSED" -lt 4 ]; ok $? "rodaram em paralelo (${ELAPSED}s < 4s; serial seria >= 4s)"
 grep -q "META exit=0" "$TMP/o1"; ok $? "META exit=0 presente"
 [ "$(git worktree list | wc -l)" = 1 ]; ok $? "nenhum worktree sobrando"
@@ -64,6 +64,17 @@ git rev-parse --verify -q fix/incident-9001 >/dev/null; ok $? "branch fix/incide
 [ "$(git branch --show-current)" = main ]; ok $? "árvore principal continua em main"
 git branch -q -D fix/incident-9001
 
+echo "== fix com arquivo no formato array (produção)"
+mk 9002 WFB
+bash services/heal-run.sh fix 9002 > "$TMP/f2" 2>&1
+# para o 9002 só WFB é permitido; o stub edita WFA + OUT_OF_SCOPE -> os dois devem ser apontados
+grep -q 'scope_violation=OUT_OF_SCOPE.txt,workflows/WFA.json$' "$TMP/f2" && ! grep -q 'Traceback' "$TMP/f2"; ok $? "checagem de escopo funciona com array e aponta TODOS os fora do escopo (antes: quebrava em silêncio)"
+git branch -q -D fix/incident-9002
+echo "== escopo: falha fechada"
+echo '"nao-e-um-incidente"' > .incident/incident-9004.json
+bash services/heal-run.sh fix 9004 > "$TMP/f4" 2>&1
+grep -q 'scope_violation=check_failed' "$TMP/f4"; ok $? "se a checagem de escopo quebra, sinaliza check_failed (não 'none')"
+git branch -q -D fix/incident-9004 2>/dev/null
 echo "== robustez"
 rm -f .incident/incident-9003.json
 bash services/heal-run.sh diagnose 9003 >/dev/null 2>&1; [ $? = 2 ]; ok $? "incidente sem arquivo -> exit 2"

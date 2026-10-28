@@ -59,7 +59,8 @@ mkdir -p "$WT/.incident"
 cp "$INCIDENT_FILE" "$WT/.incident/current.json"
 
 BASE="$(git -C "$WT" rev-parse HEAD)"
-WF_FILE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("workflow_file",""))' "$INCIDENT_FILE")"
+# n8n's Convert to File writes an array ([{...}]); accept that and a plain object
+WF_FILE="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d=d[0] if isinstance(d,list) else d; print(d.get("workflow_file",""))' "$INCIDENT_FILE")"
 SNAP="none"
 if [ -n "$WF_FILE" ] && [ -f "$WT/$WF_FILE" ]; then
   SNAP="$(sha256sum "$WT/$WF_FILE" | cut -d' ' -f1)"
@@ -69,7 +70,7 @@ echo "META mode=$MODE incident=$ID base=$BASE snapshot=$SNAP worktree=$WT"
 if [ "$MODE" = diagnose ]; then
   (cd "$WT" && "$CLAUDE" -p "$(cat prompts/diagnose.md)" \
     --allowedTools "Read,Grep,Glob" \
-    --output-format json --max-turns 25)
+    --output-format json --max-turns 25 </dev/null)
   CODE=$?
   echo "META exit=$CODE"
   exit 0
@@ -77,7 +78,7 @@ fi
 
 (cd "$WT" && "$CLAUDE" -p "$(cat prompts/fix.md)" \
   --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git:*),Bash(gh pr create:*)" \
-  --output-format json --max-turns 40)
+  --output-format json --max-turns 40 </dev/null)
 CODE=$?
 
 # Scope check: the approved diagnosis lists the files that may change. Anything else
@@ -85,13 +86,14 @@ CODE=$?
 VIOLATION="$(python3 - "$INCIDENT_FILE" "$WT" "$BASE" <<'PY'
 import json, subprocess, sys
 incident, wt, base = sys.argv[1:4]
-allowed = set(json.load(open(incident)).get("diagnosis", {}).get("files_to_change") or [])
+d = json.load(open(incident)); d = d[0] if isinstance(d, list) else d
+allowed = set((d.get("diagnosis") or {}).get("files_to_change") or [])
 def git(*a):
     return subprocess.run(["git", "-C", wt, *a], capture_output=True, text=True).stdout.split("\n")
 changed = set(filter(None, git("diff", "--name-only", f"{base}..HEAD")))
 changed |= {l[3:] for l in git("status", "--porcelain") if len(l) > 3 and not l[3:].startswith(".incident/")}
 print(",".join(sorted(changed - allowed)))
 PY
-)"
+)" || VIOLATION="check_failed"   # fail closed: if the check itself breaks, a human must look
 echo "META exit=$CODE scope_violation=${VIOLATION:-none}"
 exit 0
